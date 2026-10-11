@@ -20,3 +20,10 @@ lecture3/**/*.html
 
 # Output folders suggested in the docstrings
 out/
+
+# lecture6/slam: what the scripts write next to themselves
+lecture6/slam/stereo/
+lecture6/slam/figs/
+lecture6/slam/measured_*.json
+lecture6/slam/*_results.npz
+lecture6/slam/bow_similarity.npy
