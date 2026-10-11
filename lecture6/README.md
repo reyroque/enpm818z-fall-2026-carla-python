@@ -18,14 +18,26 @@ Add `--snapshot out.png` to save a still instead of opening a window.
 | `--particles N` | mcl | number of particles (default 2000) |
 | `--seed S` | mcl | random seed (default 818) |
 | `--icp-start EAST NORTH DEG` | icp | how far off the truth ICP starts (default `1.5 -1.0 5`) |
+| `--time T` | gnss | open (or snapshot) at T seconds instead of the start; the slides use `--time 61.55`, the middle of the outage |
 
 ## What each part shows
 
-1. **gnss**: the GNSS fixes as they arrive, against the true route. Drag the
-   time slider: a fix every second, then none for 55 s. The two laps cover the
-   same road, so the gap shows in time, not on the map. The right plot gives
-   each fix's error east and north: their means show the bias, their spread
-   the noise.
+1. **gnss**: the GNSS fixes as they arrive. **Play** runs the drive from start
+   to finish, one second per tick (about 13 s in all); press it again to
+   pause. **Step: +1 s** moves one second, one fix, at a time. A fix every
+   second, then none for 55 s. Four panels:
+   - **the whole route**: the truth, the fixes so far, the GNSS-only path (the
+     fixes joined in order) and the AV, drawn 3 times its size so it shows;
+   - **a close-up** 40 m across that follows the AV, at true size, with a
+     dashed circle of 1.5 m (the noise we chose) around the last fix;
+   - **each fix's error against time**, east and north; the dashed lines are
+     their means;
+   - **the errors as points**, filling in as the fixes arrive (blue so far,
+     gray still to come, the newest circled): their center is the bias, their
+     spread the noise, next to the bias and the 1.5 m we chose.
+
+   The two laps cover the same road, so on the map the gap is hidden: the
+   other lap's fixes fill it. The gap shows in time.
 2. **dr**: the pose from wheel speed and yaw rate alone, against the truth.
    Watch where the error starts to grow fast.
 3. **ekf**: the fused filter's error and its own 1 sigma, and its NIS. Tick
@@ -124,3 +136,11 @@ laps, 916 m in 125.7 s; no GNSS from 250 m to 650 m along the route, 34.2 s to
    How far off can it start?
    *Reference (middle scan):* `1.5 -1 5`, `3 -2 10` and `4 -3 15` land within
    0.10 m of the truth; `6 -4 20` ends 7.09 m off.
+
+## The AV drawing
+
+`av_top.png` is the course's top view of the AV, the same drawing as on the
+slides, front up. `l6common.draw_av` puts its base link (the middle of the rear
+axle, 0.9 m in from the rear bumper) on the AV's position and turns it to the
+AV's heading.
+

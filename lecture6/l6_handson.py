@@ -13,10 +13,11 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.widgets import CheckButtons, Slider
+from matplotlib.widgets import Button, CheckButtons, Slider
 
 import icp as icpmod
 import l6common as c
+from l6common import draw_av
 import mcl as mclmod
 
 HERE = Path(__file__).resolve().parent
@@ -61,58 +62,164 @@ def gnss_stats(d):
             "outage_s": float(d["t"][k1] - d["t"][k0]), "outage_m": float(dist[k1] - dist[k0])}
 
 
-def part_gnss(fig, d, *_):
-    """The GNSS fixes as they arrive. Drag the slider: a fix every second, then none for
-    the outage. The two laps cover the same road, so the gap shows in time, not on the map.
-    Opens in the middle of the outage."""
+def _gnss_path(d, upto):
+    """The GNSS-only path: the fixes up to row upto joined in order, broken where fixes
+    are more than 1.5 s apart (the outage), so no line crosses the gap."""
+    k = np.flatnonzero(np.isfinite(d["gnss_x"][:upto + 1]))
+    x, y, t = d["gnss_x"][k], d["gnss_y"][k], d["t"][k]
+    br = np.flatnonzero(np.diff(t) > 1.5) + 1
+    return np.insert(x, br, np.nan), np.insert(y, br, np.nan)
+
+
+def part_gnss(fig, d, *_, t_open=None):
+    """The GNSS fixes as they arrive. Play runs the drive from start to finish, one second
+    per tick; Step moves one second (one fix) at a time. A fix every second, then none for
+    the outage. Opens at t_open (s), or at the start.
+      top left   the whole route; the AV drawn 3x size so it shows at this zoom
+      top right  a 40 m close-up that follows the AV, at true size, with a 1-sigma circle
+                 (the chosen noise) around the newest fix
+      bottom left  each fix's error, east and north, against time
+      bottom right the same errors as points, so far in blue, later ones in gray: their
+                   center is the bias, their spread the noise
+    The two laps cover the same road, so on the map the gap is hidden; it shows in time."""
+    import json
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Circle
+    meta = json.loads((HERE / "l6_drive_meta.json").read_text())["chosen"]
+    sigma, bias = meta["gnss_sigma_m"], meta["gnss_bias_m"]
     s = gnss_stats(d)
-    m, k0, k1, dist = s["mask"], s["k0"], s["k1"], s["dist"]
-    ax1 = fig.add_axes([0.06, 0.2, 0.40, 0.68])
-    ax2 = fig.add_axes([0.56, 0.2, 0.40, 0.68])
-    sax = fig.add_axes([0.2, 0.06, 0.6, 0.035])
+    m, k0, k1 = s["mask"], s["k0"], s["k1"]
     t = d["t"]
-    sl = Slider(sax, "time (s)", float(t[0]), float(t[-1]), valinit=float((t[k0] + t[k1]) / 2))
-    ax2.axvspan(t[k0], t[k1], color="#c0392b", alpha=0.12,
-                label=f"last fix to first fix: {s['outage_s']:.1f} s, {s['outage_m']:.0f} m")
-    ax2.plot(t[m], s["ex"], ".", color="#1f6fb4", label="east error")
-    ax2.plot(t[m], s["ey"], ".", color="#c9682f", label="north error")
-    ax2.axhline(s["mean"][0], color="#1f6fb4", ls="--", lw=1)
-    ax2.axhline(s["mean"][1], color="#c9682f", ls="--", lw=1)
-    ax2.axhline(0, color="0.5", lw=0.5)
+    ax_map = fig.add_axes([0.05, 0.56, 0.42, 0.38])
+    ax_zoom = fig.add_axes([0.55, 0.56, 0.40, 0.38])
+    ax_err = fig.add_axes([0.07, 0.13, 0.42, 0.33])
+    ax_sc = fig.add_axes([0.55, 0.13, 0.22, 0.33])   # legend to its right
+    t_start, t_end = float(t[0]), float(t[-1])
+    now_t = [t_start if t_open is None else min(max(float(t_open), t_start), t_end)]
+    b_play = Button(fig.add_axes([0.36, 0.02, 0.12, 0.045]), "Play")
+    b_step = Button(fig.add_axes([0.52, 0.02, 0.12, 0.045]), "Step: +1 s")
+
+    # bottom left: error against time (fixed), with a line for the current time
+    ax_err.axvspan(t[k0], t[k1], color="#c0392b", alpha=0.12,
+                   label=f"last fix to first fix: {s['outage_s']:.1f} s, {s['outage_m']:.0f} m")
+    ax_err.plot(t[m], s["ex"], ".", color="#1f6fb4", label="east error")
+    ax_err.plot(t[m], s["ey"], ".", color="#c9682f", label="north error")
+    ax_err.axhline(s["mean"][0], color="#1f6fb4", ls="--", lw=1)
+    ax_err.axhline(s["mean"][1], color="#c9682f", ls="--", lw=1)
+    ax_err.axhline(0, color="0.5", lw=0.5)
     lo = min(s["ex"].min(), s["ey"].min())
-    ax2.set_ylim(lo - 1.6, max(s["ex"].max(), s["ey"].max()) + 0.4)   # room for the legend below the dots
-    ax2.set_xlabel("time (s)"); ax2.set_ylabel("fix minus truth (m)")
-    ax2.legend(loc="lower center", ncol=3, fontsize=8)
-    ax2.set_title(f"{s['n']} fixes. Mean (dashed) {s['mean'][0]:+.2f} m east, {s['mean'][1]:+.2f} m north;"
-                  f"\nspread {s['std'][0]:.2f} m east, {s['std'][1]:.2f} m north")
-    now = ax2.axvline(sl.valinit, color="k", lw=1)
+    ax_err.set_ylim(lo - 1.6, max(s["ex"].max(), s["ey"].max()) + 0.4)
+    ax_err.set_xlabel("time (s)"); ax_err.set_ylabel("fix minus truth (m)")
+    ax_err.legend(loc="lower center", ncol=3, fontsize=8)
+    ax_err.set_title(f"{s['n']} fixes; dashed: their means")
+    now = ax_err.axvline(now_t[0], color="k", lw=1)
+
+    # bottom right: bias against noise; the fixes so far in blue, the later ones in gray
+    ax_sc.plot(s["ex"], s["ey"], ".", color="0.8", label="later fixes")
+    sc_sofar, = ax_sc.plot([], [], ".", color="#1f6fb4", label="one fix's error, so far")
+    sc_last, = ax_sc.plot([], [], "o", mfc="none", mec="#1f6fb4", ms=10, label="last fix")
+    ax_sc.add_patch(Circle(bias, sigma, fill=False, ls="--", color="#c9682f",
+                           label=f"{sigma:g} m circle (noise we chose)"))
+    ax_sc.plot(*bias, "+", color="#c9682f", ms=12, mew=2,
+               label=f"bias we chose ({bias[0]:+g} E, {bias[1]:+g} N)")
+    ax_sc.plot(*s["mean"], "x", color="k", ms=10, mew=2,
+               label=f"mean of all {s['n']}, measured ({s['mean'][0]:+.2f} E, {s['mean'][1]:+.2f} N)")
+    ax_sc.axhline(0, color="0.6", lw=0.5); ax_sc.axvline(0, color="0.6", lw=0.5)
+    r = 1.15 * max(np.abs(s["ex"]).max(), np.abs(s["ey"]).max())
+    ax_sc.set_xlim(-r, r); ax_sc.set_ylim(-r, r); ax_sc.set_aspect("equal")
+    ax_sc.set_xlabel("east error (m)"); ax_sc.set_ylabel("north error (m)")
+    ax_sc.set_title("bias (center) against noise (spread)")
+    ax_sc.legend(loc="upper left", bbox_to_anchor=(1.03, 1.0), fontsize=7, borderaxespad=0)
+
+    proxy_av = Line2D([], [], marker="s", color="k", ls="", ms=7)
+
+    def draw_map(ax, tc, k, zoom):
+        got = m & (t <= tc)
+        last = int(np.flatnonzero(got)[-1]) if got.any() else None
+        ax.clear()
+        ax.plot(d["x"], d["y"], "-", color="0.85", lw=0.8)
+        ax.plot(d["x"][:k + 1], d["y"][:k + 1], "k-", lw=1, label="truth so far")
+        px, py = _gnss_path(d, k)
+        ax.plot(px, py, "-", color="#1f6fb4", lw=0.8, alpha=0.7, label="GNSS-only path")
+        ax.plot(d["gnss_x"][got], d["gnss_y"][got], ".", color="#1f6fb4", ms=6, label="fixes so far")
+        if last is not None:
+            ax.plot(d["gnss_x"][last], d["gnss_y"][last], "o", mfc="none", mec="#1f6fb4",
+                    ms=11 if not zoom else 8, label="last fix")
+        draw_av(ax, d["x"][k], d["y"][k], d["theta"][k], scale=1.0 if zoom else 3.0)
+        ax.set_aspect("equal")
+        if zoom:
+            if last is not None:
+                ax.add_patch(Circle((d["gnss_x"][last], d["gnss_y"][last]), sigma, fill=False,
+                                    ls="--", color="#1f6fb4", lw=1.2))
+            ax.set_xlim(d["x"][k] - 20, d["x"][k] + 20); ax.set_ylim(d["y"][k] - 20, d["y"][k] + 20)
+            ax.set_title(f"close-up, 40 m across, true size; dashed: {sigma:g} m around the last fix",
+                         fontsize=9)
+            handles, labels = ax.get_legend_handles_labels()
+            ax.legend(handles + [proxy_av], labels + ["the AV (true size)"], loc="upper left", fontsize=7)
+        else:
+            # imshow (the AV) resets the limits to its own extent: fix them to the route
+            pad = 8.0
+            ax.set_xlim(np.nanmin(d["x"]) - pad, np.nanmax(d["x"]) + pad)
+            ax.set_ylim(np.nanmin(d["y"]) - pad, np.nanmax(d["y"]) + pad)
+            gap = tc - t[last] if last is not None else tc - t[0]
+            if last is not None and gap > 1.5:
+                ax.set_title(f"t = {tc:.0f} s: no fix for {gap:.0f} s; "
+                             f"the AV drove {s['dist'][k] - s['dist'][last]:.0f} m since the last one", fontsize=9)
+            else:
+                ax.set_title(f"t = {tc:.0f} s: a fix every second", fontsize=9)
+            handles, labels = ax.get_legend_handles_labels()
+            ax.legend(handles + [proxy_av], labels + ["the AV (drawn 3x size)"], loc="center", fontsize=7)
+        ax.set_xlabel("x east (m)"); ax.set_ylabel("y north (m)")
+
+    t_fix = t[m]                              # the time of each fix, in the order of ex, ey
 
     def draw(tc):
+        now_t[0] = tc
         k = int(np.searchsorted(t, tc, side="right")) - 1
-        got = m & (t <= tc)
-        ax1.clear()
-        ax1.plot(d["x"], d["y"], "-", color="0.85", lw=0.8)
-        ax1.plot(d["x"][:k + 1], d["y"][:k + 1], "k-", lw=1, label="truth so far")
-        ax1.plot(d["gnss_x"][got], d["gnss_y"][got], ".", color="#1f6fb4", ms=6, label="fixes so far")
-        ax1.plot(d["x"][k], d["y"][k], "o", color="k", ms=7, label="the AV now")
-        last = int(np.flatnonzero(got)[-1]) if got.any() else None
-        if last is not None:
-            ax1.plot(d["gnss_x"][last], d["gnss_y"][last], "o", mfc="none", mec="#1f6fb4", ms=11,
-                     label="last fix")
-        gap = tc - t[last] if last is not None else tc - t[0]
-        if last is not None and gap > 1.5:
-            ax1.set_title(f"t = {tc:.0f} s: no fix for {gap:.0f} s;\n"
-                          f"the AV drove {dist[k] - dist[last]:.0f} m since the last one")
-        else:
-            ax1.set_title(f"t = {tc:.0f} s: a fix every second")
-        ax1.set_aspect("equal"); ax1.legend(loc="center", fontsize=8)
-        ax1.set_xlabel("x east (m)"); ax1.set_ylabel("y north (m)")
+        draw_map(ax_map, tc, k, zoom=False)
+        draw_map(ax_zoom, tc, k, zoom=True)
         now.set_xdata([tc, tc])
+        n = int(np.searchsorted(t_fix, tc, side="right"))   # fixes so far
+        sc_sofar.set_data(s["ex"][:n], s["ey"][:n])
+        sc_last.set_data(s["ex"][n - 1:n], s["ey"][n - 1:n])
         fig.canvas.draw_idle()
 
-    sl.on_changed(draw)
-    draw(sl.valinit)
-    fig._keep = sl
+    # Play: one second of the drive per 100 ms tick, so the 126 s drive takes about 13 s
+    timer = fig.canvas.new_timer(interval=100)
+    playing = [False]
+
+    def stop():
+        timer.stop()
+        playing[0] = False
+        b_play.label.set_text("Play")
+        fig.canvas.draw_idle()
+
+    def tick():
+        if now_t[0] >= t_end:
+            stop()
+        else:
+            draw(min(now_t[0] + 1.0, t_end))
+
+    def on_play(_):
+        if playing[0]:
+            stop()
+            return
+        if now_t[0] >= t_end:                 # at the end: play again from the start
+            draw(t_start)
+        playing[0] = True
+        b_play.label.set_text("Pause")
+        timer.start()
+
+    def on_step(_):
+        if playing[0]:
+            stop()
+        draw(min(now_t[0] + 1.0, t_end))
+
+    timer.add_callback(tick)
+    b_play.on_clicked(on_play)
+    b_step.on_clicked(on_step)
+    draw(now_t[0])
+    fig._keep = (b_play, b_step, timer)
 
 
 def part_dr(fig, d, *_):
@@ -218,13 +325,16 @@ def main(argv=None):
     ap.add_argument("--html")
     ap.add_argument("--particles", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=818)
+    ap.add_argument("--time", type=float, help="gnss: open at this time (s) instead of the start")
     ap.add_argument("--icp-start", type=float, nargs=3, default=(1.5, -1.0, 5.0), metavar=("EAST", "NORTH", "DEG"),
                     help="ICP's starting guess, off the truth by EAST m, NORTH m and DEG degrees")
     a = ap.parse_args(argv)
     d, st, scans, mp = data()
-    fig = plt.figure(figsize=(12, 6))
-    if a.part in ("gnss", "dr", "ekf"):
-        {"gnss": part_gnss, "dr": part_dr, "ekf": part_ekf}[a.part](fig, d)
+    fig = plt.figure(figsize=(13, 10) if a.part == "gnss" else (12, 6))
+    if a.part == "gnss":
+        part_gnss(fig, d, t_open=a.time)
+    elif a.part in ("dr", "ekf"):
+        {"dr": part_dr, "ekf": part_ekf}[a.part](fig, d)
     elif a.part == "icp":
         part_icp(fig, d, st, scans, mp, start=a.icp_start)
     else:

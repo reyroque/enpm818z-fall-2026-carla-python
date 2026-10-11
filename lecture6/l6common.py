@@ -82,3 +82,26 @@ def load_scans(path):
     t, counts, points = d["t"], d["counts"], d["points"]
     offs = np.concatenate([[0], np.cumsum(counts)])
     return t, [points[offs[i]:offs[i + 1]] for i in range(len(counts))]
+
+
+# ---------------------------------------------------------------- the AV drawing
+_AV_IMG = None
+
+
+def draw_av(ax, x, y, theta, scale=1.0, length=4.5, zorder=5):
+    """Draw the AV seen from above (av_top.png, front up), its base link (the middle of
+    the rear axle, 0.9 m in from the rear bumper of the 4.5 m car) on (x, y), turned to
+    heading theta (rad, counterclockwise from east). scale > 1 draws it larger than life,
+    for a map where the true 4.5 m would be too small to see."""
+    global _AV_IMG
+    import matplotlib.pyplot as plt
+    from matplotlib.transforms import Affine2D
+    if _AV_IMG is None:
+        _AV_IMG = plt.imread(Path(__file__).resolve().parent / "av_top.png")
+    h, w = _AV_IMG.shape[:2]
+    L = length * scale
+    W = L * w / h
+    im = ax.imshow(_AV_IMG, extent=(-W / 2, W / 2, -0.9 * scale, L - 0.9 * scale),
+                   zorder=zorder, interpolation="antialiased")
+    im.set_transform(Affine2D().rotate(theta - np.pi / 2).translate(x, y) + ax.transData)
+    return im
