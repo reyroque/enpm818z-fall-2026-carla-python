@@ -73,7 +73,7 @@ def _gnss_path(d, upto):
 
 def part_gnss(fig, d, *_, t_open=None):
     """The GNSS fixes as they arrive. Play runs the drive from start to finish, one second
-    per tick; Step moves one second (one fix) at a time. A fix every second, then none for
+    per tick; Step moves one second (one fix) at a time; Reset goes back to the start. A fix every second, then none for
     the outage. Opens at t_open (s), or at the start.
       top left   the whole route; the AV drawn 3x size so it shows at this zoom
       top right  a 40 m close-up that follows the AV, at true size, with a 1-sigma circle
@@ -96,8 +96,9 @@ def part_gnss(fig, d, *_, t_open=None):
     ax_sc = fig.add_axes([0.55, 0.13, 0.22, 0.33])   # legend to its right
     t_start, t_end = float(t[0]), float(t[-1])
     now_t = [t_start if t_open is None else min(max(float(t_open), t_start), t_end)]
-    b_play = Button(fig.add_axes([0.36, 0.02, 0.12, 0.045]), "Play")
-    b_step = Button(fig.add_axes([0.52, 0.02, 0.12, 0.045]), "Step: +1 s")
+    b_play = Button(fig.add_axes([0.28, 0.02, 0.12, 0.045]), "Play")
+    b_step = Button(fig.add_axes([0.44, 0.02, 0.12, 0.045]), "Step: +1 s")
+    b_reset = Button(fig.add_axes([0.60, 0.02, 0.12, 0.045]), "Reset")
 
     # bottom left: error against time (fixed), with a line for the current time
     ax_err.axvspan(t[k0], t[k1], color="#c0392b", alpha=0.12,
@@ -215,11 +216,17 @@ def part_gnss(fig, d, *_, t_open=None):
             stop()
         draw(min(now_t[0] + 1.0, t_end))
 
+    def on_reset(_):                          # stop and go back to the start of the drive
+        if playing[0]:
+            stop()
+        draw(t_start)
+
     timer.add_callback(tick)
     b_play.on_clicked(on_play)
     b_step.on_clicked(on_step)
+    b_reset.on_clicked(on_reset)
     draw(now_t[0])
-    fig._keep = (b_play, b_step, timer)
+    fig._keep = (b_play, b_step, b_reset, timer)
 
 
 def part_dr(fig, d, *_):

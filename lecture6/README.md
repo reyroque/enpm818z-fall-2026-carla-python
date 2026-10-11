@@ -24,7 +24,8 @@ Add `--snapshot out.png` to save a still instead of opening a window.
 
 1. **gnss**: the GNSS fixes as they arrive. **Play** runs the drive from start
    to finish, one second per tick (about 13 s in all); press it again to
-   pause. **Step: +1 s** moves one second, one fix, at a time. A fix every
+   pause. **Step: +1 s** moves one second, one fix, at a time; **Reset**
+   goes back to the start. A fix every
    second, then none for 55 s. Four panels:
    - **the whole route**: the truth, the fixes so far, the GNSS-only path (the
      fixes joined in order) and the AV, drawn 3 times its size so it shows;
