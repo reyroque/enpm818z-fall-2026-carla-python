@@ -4,7 +4,7 @@
 
 """YOLOv8s and RT-DETR-L on the same frames, side by side.
 
-The L4 live demo, and a head start on GP2: both detectors GP2 fine-tunes, run
+The L4 live demo, and a head start on GP2: both detectors GP2 compares, run
 with their COCO weights on your frames (a CARLA camera image, a folder of them,
 or any image). For each frame it draws both sets of boxes next to each other and
 prints, per class, how many objects each model found and their mean confidence,

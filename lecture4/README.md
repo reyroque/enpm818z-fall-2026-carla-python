@@ -10,7 +10,7 @@ it at your own image, for example a camera frame from GP1.
 | `rtdetr_set_prediction.ipynb` | set prediction, **RT-DETR-L** | open the 300 x 84 output matrix, check that no NMS is needed, pair queries with objects with the Hungarian algorithm, compute attention by hand, compare with YOLOv8s |
 | `compare_detectors.py` | both | the live demo: both models on the same frames, boxes side by side, median time per frame |
 
-YOLOv8s and RT-DETR-L are the two models you fine-tune in GP2.
+YOLOv8s and RT-DETR-L are the two models GP2 compares, with their COCO weights.
 
 ## Requirements
 
