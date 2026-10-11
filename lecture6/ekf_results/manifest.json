@@ -1,0 +1,74 @@
+[
+  {
+    "file": "run_gps0_wheels1_map0.npz",
+    "outage": true,
+    "wheels": true,
+    "map": false,
+    "ape_rmse": 4.993,
+    "ape_max": 9.5,
+    "map_rejected": 0
+  },
+  {
+    "file": "run_gps0_wheels1_map1.npz",
+    "outage": true,
+    "wheels": true,
+    "map": true,
+    "ape_rmse": 0.515,
+    "ape_max": 2.487,
+    "map_rejected": 1
+  },
+  {
+    "file": "run_gps0_wheels0_map0.npz",
+    "outage": true,
+    "wheels": false,
+    "map": false,
+    "ape_rmse": 4.583,
+    "ape_max": 12.36,
+    "map_rejected": 0
+  },
+  {
+    "file": "run_gps0_wheels0_map1.npz",
+    "outage": true,
+    "wheels": false,
+    "map": true,
+    "ape_rmse": 27.665,
+    "ape_max": 65.616,
+    "map_rejected": 3
+  },
+  {
+    "file": "run_gps1_wheels1_map0.npz",
+    "outage": false,
+    "wheels": true,
+    "map": false,
+    "ape_rmse": 1.278,
+    "ape_max": 2.615,
+    "map_rejected": 0
+  },
+  {
+    "file": "run_gps1_wheels1_map1.npz",
+    "outage": false,
+    "wheels": true,
+    "map": true,
+    "ape_rmse": 0.471,
+    "ape_max": 2.382,
+    "map_rejected": 1
+  },
+  {
+    "file": "run_gps1_wheels0_map0.npz",
+    "outage": false,
+    "wheels": false,
+    "map": false,
+    "ape_rmse": 1.965,
+    "ape_max": 5.928,
+    "map_rejected": 0
+  },
+  {
+    "file": "run_gps1_wheels0_map1.npz",
+    "outage": false,
+    "wheels": false,
+    "map": true,
+    "ape_rmse": 1.384,
+    "ape_max": 6.811,
+    "map_rejected": 5
+  }
+]
