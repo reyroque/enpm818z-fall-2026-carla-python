@@ -39,8 +39,14 @@ Add `--snapshot out.png` to save a still instead of opening a window.
 
    The two laps cover the same road, so on the map the gap is hidden: the
    other lap's fixes fill it. The gap shows in time.
-2. **dr**: the pose from wheel speed and yaw rate alone, against the truth.
-   Watch where the error starts to grow fast.
+2. **dr**: the pose from wheel speed and yaw rate alone through the outage,
+   against the truth, from the true pose at the last fix. Three panels: the
+   outage from above, the position error and the heading error, both against
+   the distance since the last fix. Two check boxes hold the errors we chose:
+   untick **gyro bias** to subtract the 0.001 rad/s from every gyro reading,
+   untick **wheels 0.5 % fast** to divide every wheel reading by 1.005, and
+   dead reckoning runs again. What stays is the sensors' noise and CARLA's own
+   gyro, which reports a little more turning than the car makes in a corner.
 3. **ekf**: the fused filter's error and its own 1 sigma, and its NIS. Tick
    **GNSS outage**, **wheels** and **map matching** to switch between eight
    runs. The runs were computed in advance and saved in `ekf_results/`; this

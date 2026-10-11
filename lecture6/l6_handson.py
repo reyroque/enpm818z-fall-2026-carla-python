@@ -231,21 +231,56 @@ def part_gnss(fig, d, *_, t_open=None):
 
 def part_dr(fig, d, *_):
     """Dead reckoning through the outage, from the true pose at the last fix
-    before it (the best start it could have), as on the slide."""
+    before it (the best start it could have), as on the slide. Untick an error to
+    remove it from the recorded signals and run dead reckoning again:
+      gyro bias     subtract the chosen 0.001 rad/s from every gyro reading
+      wheels fast   divide every wheel reading by 1.005 (the chosen 0.5 % scale)
+    What is left: the sensors' noise, and CARLA's own gyro, which reports a little
+    more turning than the car makes in a corner.
+      left          the outage from above: truth and dead reckoning
+      right, top    the position error against distance since the last fix
+      right, bottom the heading error against the same distance"""
+    import json
+    meta = json.loads((HERE / "l6_drive_meta.json").read_text())["chosen"]
     k0, k1 = outage_rows(d)
     sl = slice(k0, k1 + 1)
-    x, y, _ = c.dead_reckon(d["t"][sl], d["wheel_v"][sl], d["gyro_z"][sl], d["x"][k0], d["y"][k0], d["theta"][k0])
-    err = np.hypot(x - d["x"][sl], y - d["y"][sl])
-    dist = np.concatenate([[0], np.cumsum(np.hypot(np.diff(d["x"][sl]), np.diff(d["y"][sl])))])
-    ax1, ax2 = fig.subplots(1, 2)
-    ax1.plot(d["x"][sl], d["y"][sl], "k-", lw=1, label="truth")
-    ax1.plot(x, y, color="#c9682f", label="dead reckoning")
-    ax1.plot(d["x"][k0], d["y"][k0], "ko"); ax1.annotate("last fix", (d["x"][k0], d["y"][k0]), xytext=(6, -14),
-                                                       textcoords="offset points")
-    ax1.set_aspect("equal"); ax1.legend(); ax1.set_xlabel("x east (m)"); ax1.set_ylabel("y north (m)")
-    ax2.plot(dist, err, color="#c9682f")
-    ax2.set_xlabel("distance since the last fix (m)"); ax2.set_ylabel("position error (m)")
-    ax2.set_title(f"after {dist[-1]:.0f} m: {err[-1]:.2f} m off; worst {err.max():.2f} m")
+    tx, ty, tth = d["x"][sl], d["y"][sl], d["theta"][sl]
+    dist = np.concatenate([[0], np.cumsum(np.hypot(np.diff(tx), np.diff(ty)))])
+    ax1 = fig.add_axes([0.06, 0.24, 0.40, 0.70])
+    ax2 = fig.add_axes([0.56, 0.56, 0.40, 0.36])
+    ax3 = fig.add_axes([0.56, 0.12, 0.40, 0.32], sharex=ax2)
+    cax = fig.add_axes([0.08, 0.01, 0.30, 0.10])   # under the map
+    cax.set_frame_on(False)
+    labels = [f"gyro bias ({meta['gyro_bias_rps']:g} rad/s)", f"wheels {100 * meta['wheel_scale']:g} % fast"]
+    cb = CheckButtons(cax, labels, [True, True])
+    fig.text(0.08, 0.115, "the errors we chose (untick one to remove it):", fontsize=9)
+
+    def draw():
+        bias_on, scale_on = cb.get_status()
+        gyro = d["gyro_z"][sl] - (0.0 if bias_on else meta["gyro_bias_rps"])
+        wheel = d["wheel_v"][sl] / (1.0 if scale_on else 1.0 + meta["wheel_scale"])
+        x, y, th = c.dead_reckon(d["t"][sl], wheel, gyro, tx[0], ty[0], tth[0])
+        err = np.hypot(x - tx, y - ty)
+        herr = np.degrees(np.angle(np.exp(1j * (th - tth))))
+        for ax in (ax1, ax2, ax3):
+            ax.clear()
+        ax1.plot(tx, ty, "k-", lw=1, label="truth")
+        ax1.plot(x, y, color="#c9682f", label="dead reckoning")
+        ax1.plot(tx[0], ty[0], "ko"); ax1.annotate("last fix", (tx[0], ty[0]), xytext=(6, -14),
+                                                   textcoords="offset points")
+        ax1.set_aspect("equal"); ax1.legend(loc="center"); ax1.set_xlabel("x east (m)"); ax1.set_ylabel("y north (m)")
+        ax2.plot(dist, err, color="#c9682f")
+        ax2.set_ylabel("position error (m)")
+        ax2.set_title(f"after {dist[-1]:.0f} m: {err[-1]:.2f} m off; worst {err.max():.2f} m", fontsize=10)
+        ax3.plot(dist, herr, color="#c9682f")
+        ax3.axhline(0, color="0.6", lw=0.5)
+        ax3.set_xlabel("distance since the last fix (m)"); ax3.set_ylabel("heading error (deg)")
+        ax3.set_title(f"heading error at the end: {herr[-1]:+.1f} deg", fontsize=10)
+        fig.canvas.draw_idle()
+
+    cb.on_clicked(lambda _: draw())
+    draw()
+    fig._keep = cb
 
 
 def part_ekf(fig, d, *_):
