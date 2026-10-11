@@ -77,5 +77,8 @@ def save_scans(path, times, scans):
 
 def load_scans(path):
     d = np.load(path)
-    offs = np.concatenate([[0], np.cumsum(d["counts"])])
-    return d["t"], [d["points"][offs[i]:offs[i + 1]] for i in range(len(d["counts"]))]
+    # Read each array once: an NpzFile does not cache, so d["points"] inside the loop
+    # would decompress the whole file again for every scan (42 s instead of under 1 s).
+    t, counts, points = d["t"], d["counts"], d["points"]
+    offs = np.concatenate([[0], np.cumsum(counts)])
+    return t, [points[offs[i]:offs[i + 1]] for i in range(len(counts))]
