@@ -144,6 +144,12 @@ laps, 916 m in 125.7 s; no GNSS from 250 m to 650 m along the route, 34.2 s to
    *Reference (middle scan):* `1.5 -1 5`, `3 -2 10` and `4 -3 15` land within
    0.10 m of the truth; `6 -4 20` ends 7.09 m off.
 
+## SLAM
+
+`slam/` holds the code behind the two reading pages on SLAM: graph SLAM on
+this drive's scans, and visual SLAM on the same route recorded with a stereo
+camera. See `slam/README.md`.
+
 ## The AV drawing
 
 `av_top.png` is the course's top view of the AV, the same drawing as on the
