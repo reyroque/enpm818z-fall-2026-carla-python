@@ -315,13 +315,15 @@ def part_ekf(fig, d, *_):
     fig._keep = cb
 
 
-def part_mcl(fig, d, st, scans, mp, n=2000, seed=818):
+def part_mcl(fig, d, st, scans, mp, n=2000, seed=818, kidnap=None, n_random=0, random_radius=20.0):
     # Cold start: the first GNSS fix says "within about 20 m", heading unknown.
+    # kidnap = (t, east, north): at t s every particle jumps east and north (m).
     first = int(np.flatnonzero(np.isfinite(d["gnss_x"]))[0])
     st, scans = st[::5], scans[::5]                     # one scan every 0.5 s
     out = mclmod.run_mcl(d["t"], d["wheel_v"], d["gyro_z"], st, scans, mclmod.LikelihoodField(mp), n=n,
                          rng=np.random.default_rng(seed), init="coarse",
-                         init_pose=(d["gnss_x"][first], d["gnss_y"][first]), radius=20.0)
+                         init_pose=(d["gnss_x"][first], d["gnss_y"][first]), radius=20.0,
+                         kidnap=kidnap, n_random=n_random, random_radius=random_radius)
     k = [int(np.argmin(np.abs(d["t"] - s))) for s in st]
     err = np.hypot(out["mean"][:, 0] - d["x"][k], out["mean"][:, 1] - d["y"][k])
     ax1, ax2 = fig.subplots(1, 2)
@@ -329,6 +331,9 @@ def part_mcl(fig, d, st, scans, mp, n=2000, seed=818):
     ax1.plot(out["mean"][:, 0], out["mean"][:, 1], color="#2e7d32", label="MCL mean")
     ax1.plot(d["x"], d["y"], "k-", lw=0.8, label="truth"); ax1.set_aspect("equal"); ax1.legend()
     ax2.plot(st, err, color="#2e7d32", label="error (m)"); ax2.plot(st, out["spread"], "--", color="0.4", label="spread (m)")
+    if kidnap is not None:
+        ax2.axvline(kidnap[0], color="#c9682f", ls=":", label="kidnap")
+    ax2.set_title(f"{n} particles, {n_random} random per scan")
     ax2.set_xlabel("time (s)"); ax2.legend()
 
 
@@ -368,6 +373,12 @@ def main(argv=None):
     ap.add_argument("--particles", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=818)
     ap.add_argument("--time", type=float, help="gnss: open at this time (s) instead of the start")
+    ap.add_argument("--kidnap", type=float, nargs=3, metavar=("T", "EAST", "NORTH"),
+                    help="mcl: at T s, every particle jumps EAST and NORTH m, as if the AV had been moved")
+    ap.add_argument("--random", type=int, default=0, metavar="K",
+                    help="mcl: after each scan, K particles get random poses near MCL's estimate")
+    ap.add_argument("--random-radius", type=float, default=20.0, metavar="R",
+                    help="mcl: the random poses lie within R m of MCL's estimate (default 20)")
     ap.add_argument("--icp-start", type=float, nargs=3, default=(1.5, -1.0, 5.0), metavar=("EAST", "NORTH", "DEG"),
                     help="ICP's starting guess, off the truth by EAST m, NORTH m and DEG degrees")
     a = ap.parse_args(argv)
@@ -380,7 +391,8 @@ def main(argv=None):
     elif a.part == "icp":
         part_icp(fig, d, st, scans, mp, start=a.icp_start)
     else:
-        part_mcl(fig, d, st, scans, mp, n=a.particles, seed=a.seed)
+        part_mcl(fig, d, st, scans, mp, n=a.particles, seed=a.seed, kidnap=a.kidnap,
+                 n_random=a.random, random_radius=a.random_radius)
     if a.snapshot:
         fig.savefig(a.snapshot, dpi=120, facecolor="white")
     elif a.html:

@@ -69,13 +69,22 @@ def neff(weights):
 
 
 def run_mcl(t, wheel_v, gyro_z, scan_t, scans, field, n, rng, init, bounds=None,
-            init_pose=None, radius=20.0, sigma_v=0.3, sigma_w=0.03, max_beams=60):
+            init_pose=None, radius=20.0, sigma_v=0.3, sigma_w=0.03, max_beams=60,
+            kidnap=None, n_random=0, random_radius=20.0):
     """Run MCL over a log. init is "lost" (uniform over bounds, any heading),
     "coarse" (uniform within radius of init_pose's x, y, any heading: a cold
     start with only a rough GNSS fix), or "known" (Gaussian around init_pose).
     Resamples only when the effective particle count falls below n / 2.
     sigma_v (m per square root of s) and sigma_w (rad per square root of s) set
-    how fast the particles spread: after T seconds, about sigma_v * sqrt(T)."""
+    how fast the particles spread: after T seconds, about sigma_v * sqrt(T).
+
+    kidnap = (t_k, dx, dy): at the first scan at or after t_k s, every particle
+    jumps by (dx, dy) m, so none is near the AV any more: the same as moving the
+    AV without telling MCL. n_random: after each scan, that many particles are
+    replaced by random poses within random_radius m of MCL's estimate, any
+    heading: a common fix for a lost filter, which on our drive can also pull a
+    good estimate away (README, question 5). With both off, the random draws are
+    the same as without these options."""
     if init == "lost":
         x0, x1, y0, y1 = bounds
         parts = np.column_stack([rng.uniform(x0, x1, n), rng.uniform(y0, y1, n), rng.uniform(-np.pi, np.pi, n)])
@@ -87,6 +96,7 @@ def run_mcl(t, wheel_v, gyro_z, scan_t, scans, field, n, rng, init, bounds=None,
     else:
         parts = np.asarray(init_pose, float) + rng.normal(0, [1.0, 1.0, 0.05], (n, 3))
     wts = np.full(n, 1.0 / n)
+    kidnapped = False
     means, spreads, neffs, losts = [], [], [], []
     k = 0
     for j, ts in enumerate(scan_t):
@@ -96,6 +106,9 @@ def run_mcl(t, wheel_v, gyro_z, scan_t, scans, field, n, rng, init, bounds=None,
             w = gyro_z[k] if np.isfinite(gyro_z[k]) else 0.0
             parts = predict(parts, v, w, dt, rng, sigma_v / np.sqrt(dt), sigma_w / np.sqrt(dt))
             k += 1
+        if kidnap is not None and ts >= kidnap[0] and not kidnapped:
+            parts = parts + [kidnap[1], kidnap[2], 0.0]
+            kidnapped = True
         new, lost = weigh(parts, scans[j], field, max_beams)
         wts = wts * new
         wts = wts / wts.sum() if wts.sum() > 0 and np.isfinite(wts.sum()) else new
@@ -108,4 +121,12 @@ def run_mcl(t, wheel_v, gyro_z, scan_t, scans, field, n, rng, init, bounds=None,
         if neffs[-1] < n / 2:
             parts = parts[systematic_resample(wts, rng)]
             wts = np.full(n, 1.0 / n)
+        if n_random:
+            idx = rng.choice(n, n_random, replace=False)
+            r = random_radius * np.sqrt(rng.random(n_random))
+            a = rng.uniform(-np.pi, np.pi, n_random)
+            parts[idx] = np.column_stack([mean_xy[0] + r * np.cos(a), mean_xy[1] + r * np.sin(a),
+                                          rng.uniform(-np.pi, np.pi, n_random)])
+            wts[idx] = 1.0 / n
+            wts = wts / wts.sum()
     return {"mean": np.array(means), "spread": np.array(spreads), "neff": np.array(neffs), "lost": np.array(losts)}

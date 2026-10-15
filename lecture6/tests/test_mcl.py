@@ -77,3 +77,33 @@ def test_mcl_coarse_start_converges():
     out = mcl.run_mcl(t, np.full_like(t, 1.0), np.zeros_like(t), scan_t, scans, field,
                       n=1000, rng=rng, init="coarse", init_pose=(6.0, 3.0), radius=4.0)
     assert np.linalg.norm(out["mean"][-1, :2] - poses[-1][:2]) < 1.0
+
+
+def box_drive(seconds=10.0):
+    """The box world, the AV driving east at 1 m/s from (4, 2), a scan every 0.5 s."""
+    mp = box_map()
+    t = np.arange(0, seconds + 0.01, 0.1)
+    scan_t = t[::5]
+    poses = [np.array([4.0 + k * 0.1, 2.0, 0.0]) for k in range(len(t))]
+    scans = [scan_from(poses[int(round(s / 0.1))], mp) for s in scan_t]
+    return mp, t, scan_t, poses, scans
+
+
+def test_kidnap_and_random_off_change_nothing():
+    mp, t, scan_t, _, scans = box_drive(3.0)
+    field = mcl.LikelihoodField(mp)
+    args = (t, np.full_like(t, 1.0), np.zeros_like(t), scan_t, scans, field)
+    a = mcl.run_mcl(*args, n=300, rng=np.random.default_rng(5), init="known", init_pose=(4.0, 2.0, 0.0))
+    b = mcl.run_mcl(*args, n=300, rng=np.random.default_rng(5), init="known", init_pose=(4.0, 2.0, 0.0),
+                    kidnap=None, n_random=0)
+    assert np.array_equal(a["mean"], b["mean"])
+
+
+def test_kidnap_moves_the_estimate_off_the_av():
+    mp, t, scan_t, poses, scans = box_drive(3.0)
+    field = mcl.LikelihoodField(mp)
+    out = mcl.run_mcl(t, np.full_like(t, 1.0), np.zeros_like(t), scan_t, scans, field, n=500,
+                      rng=np.random.default_rng(5), init="known", init_pose=(4.0, 2.0, 0.0), kidnap=(2.0, 0.0, 4.0))
+    err = [np.linalg.norm(out["mean"][j, :2] - poses[int(round(s / 0.1))][:2]) for j, s in enumerate(scan_t)]
+    j = int(np.flatnonzero(scan_t >= 2.0)[0])
+    assert max(err[:j]) < 1.0 and err[j] > 2.0

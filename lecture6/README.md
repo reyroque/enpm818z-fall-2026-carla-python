@@ -17,6 +17,9 @@ Add `--snapshot out.png` to save a still instead of opening a window.
 |---|---|---|
 | `--particles N` | mcl | number of particles (default 2000) |
 | `--seed S` | mcl | random seed (default 818) |
+| `--kidnap T EAST NORTH` | mcl | at T s, every particle jumps EAST and NORTH m, as if the AV had been moved without telling MCL |
+| `--random K` | mcl | after each scan, K particles get random poses (any heading) near MCL's estimate (default 0) |
+| `--random-radius R` | mcl | how near: within R m of MCL's estimate (default 20) |
 | `--icp-start EAST NORTH DEG` | icp | how far off the truth ICP starts (default `1.5 -1.0 5`) |
 | `--time T` | gnss | open (or snapshot) at T seconds instead of the start; the slides use `--time 61.55`, the middle of the outage |
 
@@ -53,7 +56,8 @@ Add `--snapshot out.png` to save a still instead of opening a window.
    folder has no filter code. You build the filter yourself in GP3.
 4. **mcl**: 2000 particles start anywhere within 20 m of the first GNSS fix,
    with any heading. The plot shows MCL's error and the spread of its
-   particles over the drive.
+   particles over the drive. With `--kidnap`, a dotted line marks the moment
+   every particle jumps away from the AV.
 5. **icp**: one LiDAR scan, started off the truth, matched to the map. Drag
    the slider to step through the iterations.
 
@@ -139,6 +143,28 @@ laps, 916 m in 125.7 s; no GNSS from 250 m to 650 m along the route, 34.2 s to
    *Reference (seeds 0 to 4, median error after the first 10 s):* 200
    particles: 0.29, 0.78, 0.29, 0.37, 0.70 m; 2000 particles: 0.28, 0.21,
    0.27, 0.20, 0.34 m. All ten runs find the car.
+5. In `--part mcl`, lose the car on purpose: `--kidnap 40 0 10` moves every
+   particle 10 m north at 40 s. Does MCL find the car again (seeds 0 to 4)?
+   Then try `--kidnap 40 0 30`. Then add `--random 20` and `--random 100` to
+   `--kidnap 40 0 10`: do random particles help?
+   *Reference (seeds 0 to 4, seconds after the jump until the error is first
+   under 1 m):*
+
+   | Run | Seeds 0 to 4 |
+   |---|---|
+   | `--kidnap 40 0 10` | 21.6, 16.6, 16.6, 45.1, 10.6 |
+   | `--kidnap 40 0 30` | never, 72.1, never, never, never |
+   | `--kidnap 40 0 10 --random 20` | 4.6, never, 21.1, 6.1, never |
+   | `--kidnap 40 0 10 --random 100` | 3.6, 11.1, 2.6, 1.6, 10.1 |
+
+   A 10 m jump heals by itself: the particles spread while the car drives,
+   and the scans pull them back. A 30 m jump mostly does not. Random
+   particles near the estimate can speed the return, but with 20 per scan two
+   runs never return: a random particle that fits a wrong place moves the
+   estimate there, the next random particles land around it, and the estimate
+   wanders off (seed 1 ends 29.8 m off, seed 4 73.4 m). After 50 s their
+   median spread is 0.38 and 0.28 m while their median error is 101 and 64 m:
+   a small spread does not mean MCL is right.
 4. In `--part icp`, raise `--icp-start` until ICP stops landing on the walls.
    How far off can it start?
    *Reference (middle scan):* `1.5 -1 5`, `3 -2 10` and `4 -3 15` land within
