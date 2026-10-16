@@ -50,7 +50,7 @@ Add `--snapshot out.png` to save a still instead of opening a window.
    untick **wheels 0.5 % fast** to divide every wheel reading by 1.005, and
    dead reckoning runs again. What stays is the sensors' noise and CARLA's own
    gyro, which reports a little more turning than the car makes in a corner.
-3. **ekf**: the fused filter's error and its own 1 sigma, and its NIS. Tick
+3. **ekf**: the fused filter's error and its own 1 sigma. Tick
    **GNSS outage**, **wheels** and **map matching** to switch between eight
    runs. The runs were computed in advance and saved in `ekf_results/`; this
    folder has no filter code. You build the filter yourself in GP3.
@@ -136,8 +136,8 @@ laps, 916 m in 125.7 s; no GNSS from 250 m to 650 m along the route, 34.2 s to
 
    With wheels and no map, the filter's 1 sigma is 3.93 m at the outage's worst
    moment, where the real error is 9.50 m. The run "outage, no wheels, map"
-   loses the map at 45 s and stays lost until GNSS returns: find out why in its
-   NIS plot.
+   loses the map at 45 s and stays lost until GNSS returns: the slide "The run
+   that failed" explains why.
 3. In `--part mcl`, run `--particles 200` with five seeds. How many of them
    find the car? Then try 2000 particles.
    *Reference (seeds 0 to 4, median error after the first 10 s):* 200

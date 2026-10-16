@@ -21,7 +21,7 @@ from l6common import draw_av
 import mcl as mclmod
 
 HERE = Path(__file__).resolve().parent
-RESULT_KEYS = ("t", "xy", "sigma_xy", "nis_t", "nis", "nis_source", "ape_rmse", "ape_max")
+RESULT_KEYS = ("t", "xy", "sigma_xy", "ape_rmse", "ape_max")
 
 
 def load_results(folder, outage, wheels, map_):
@@ -284,21 +284,17 @@ def part_dr(fig, d, *_):
 
 
 def part_ekf(fig, d, *_):
-    ax1, ax2 = fig.subplots(2, 1, sharex=True)
+    ax1 = fig.subplots(1, 1)
     state = {"outage": True, "wheels": True, "map": False}
 
     def draw():
         r = load_results(HERE / "ekf_results", state["outage"], state["wheels"], state["map"])
         err = c.ape(r["xy"], np.column_stack([d["x"], d["y"]]))["errors"]
-        ax1.clear(); ax2.clear()
+        ax1.clear()
         ax1.plot(r["t"], err, color="#1f6fb4", label="position error")
         ax1.fill_between(r["t"], 0, np.hypot(*r["sigma_xy"].T), color="#1f6fb4", alpha=0.2, label="filter's 1 sigma")
-        ax1.set_ylabel("m"); ax1.legend(loc="upper right")
+        ax1.set_ylabel("m"); ax1.set_xlabel("time (s)"); ax1.legend(loc="upper right")
         ax1.set_title(f"APE RMSE {float(r['ape_rmse']):.2f} m, max {float(r['ape_max']):.2f} m")
-        for s, col in (("gnss", "#1f6fb4"), ("map", "#2e7d32")):
-            m = r["nis_source"] == s
-            ax2.plot(r["nis_t"][m], r["nis"][m], ".", color=col, label=f"NIS {s}")
-        ax2.set_ylabel("NIS"); ax2.set_xlabel("time (s)"); ax2.legend(loc="upper right")
         fig.canvas.draw_idle()
 
     cax = fig.add_axes([0.01, 0.4, 0.12, 0.15])
