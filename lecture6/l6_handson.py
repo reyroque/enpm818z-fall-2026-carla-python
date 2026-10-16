@@ -316,6 +316,10 @@ def part_mcl(fig, d, st, scans, mp, n=2000, seed=818, kidnap=None, n_random=0, r
     # kidnap = (t, east, north): at t s every particle jumps east and north (m).
     first = int(np.flatnonzero(np.isfinite(d["gnss_x"]))[0])
     st, scans = st[::5], scans[::5]                     # one scan every 0.5 s
+    # The filter runs before the window opens (about 12 s on a desktop): say so, so the
+    # wait does not look like a hang.
+    print(f"MCL: {n} particles over {len(st)} scans; computing, the window opens when done ...",
+          flush=True)
     out = mclmod.run_mcl(d["t"], d["wheel_v"], d["gyro_z"], st, scans, mclmod.LikelihoodField(mp), n=n,
                          rng=np.random.default_rng(seed), init="coarse",
                          init_pose=(d["gnss_x"][first], d["gnss_y"][first]), radius=20.0,
