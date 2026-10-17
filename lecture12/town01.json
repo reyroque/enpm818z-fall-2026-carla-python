@@ -1,0 +1,24 @@
+{
+  "source": "Town01.xodr",
+  "waypoints_at_2m": 3266,
+  "driving_lane_widths_m": {
+    "4.0": 3266
+  },
+  "straight_road": {
+    "road_id": 8,
+    "length_m": 310.0
+  },
+  "beside_the_right_lane": [
+    [
+      "Shoulder",
+      0.3
+    ],
+    [
+      "Sidewalk",
+      4.0
+    ]
+  ],
+  "speed_limits": {
+    "25 mph": 26
+  }
+}
