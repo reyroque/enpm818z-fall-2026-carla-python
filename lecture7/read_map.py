@@ -5,7 +5,15 @@
   python3 read_map.py
 
 Needs CARLA's Python package (pip install carla==0.9.16). No server, no GPU.
+It takes no options and opens no window. The clickable map is a different script:
+python3 l7_handson.py --part map.
 """
+import sys
+
+if len(sys.argv) > 1:
+    sys.exit("read_map.py takes no options; it prints three counts. "
+             "For the clickable map, run: python3 l7_handson.py --part map")
+
 import carla
 
 text = open("maps/Town01.xodr").read()

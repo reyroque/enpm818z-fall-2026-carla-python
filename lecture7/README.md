@@ -5,7 +5,7 @@ server, no ROS, no GPU. The `map` part also needs CARLA's Python package,
 `pip install carla==0.9.16`, which reads a map file without a server.
 
 ```bash
-python3 l7_handson.py --part map      # 0. Town01's map file, read with carla.Map
+python3 l7_handson.py --part map      # 0. Town01's map file: zoom, search, click
 python3 l7_handson.py --part graph    # 1. Town01's waypoint graph; click a node
 python3 l7_handson.py --part costs    # 2. the trip's route under three edge costs
 python3 l7_handson.py --part search   # 3. Dijkstra and A*, replayed with a slider
@@ -22,6 +22,14 @@ the `map` part, it needs CARLA's Python package and no server:
 ```bash
 python3 read_map.py
 ```
+
+`osm_to_map.py` turns an OpenStreetMap export into a CARLA map, the code on the slide
+"From your .osm file to a map, in Python". With no argument it converts
+`maps/umd_engineering.osm`, the campus around the Kim building (map data © OpenStreetMap
+contributors, ODbL), and prints 314 roads, 46 intersections and 9144 waypoints at 2 m. Give
+it your own export instead: `python3 osm_to_map.py my_area.osm`. It centers the projection
+on the file's own area and writes `my_area.xodr`, which you read with `carla.Map` as
+Town01. The converter prints many warnings about map features it skips; they are normal.
 
 **This folder has no search code.** The routes and the order in which Dijkstra and A*
 took nodes from their open sets were computed in advance by a reference planner that
@@ -41,9 +49,22 @@ Task 1 asks you to write A* on CARLA's waypoint graph yourself.
 0. **map**: reads `maps/Town01.xodr`, CARLA's map file for Town01, with
    `carla.Map("Town01", text)` and no server. It prints what the file holds (122 roads,
    96 of them inside the 12 intersections, 36 traffic lights) and what CARLA makes of
-   it (3266 waypoints at 2 m, 160 topology segments), and draws every waypoint. Click a
-   waypoint to see its road, lane and distance along the road, and the line of
-   `Town01.xodr` where that road starts. Open the file in a text editor at that line.
+   it (3266 waypoints at 2 m, 160 topology segments), and draws every waypoint. In the
+   window:
+   - **zoom** with the mouse wheel (at the cursor) or the Zoom in, Zoom out and Whole map
+     buttons;
+   - **search** in the box, then press Enter: `road 25` (or just `25`), `lane 25 -1`,
+     `junction 332`, `segment 12` (one of the 160 topology segments, 0 to 159) or
+     `waypoint 100`. The match turns pink, the view zooms to it, and the line below says
+     what the file holds about it: a road's length, its ends and the line of
+     `Town01.xodr` where it starts;
+   - **x, y**: type a position in meters, x east and y north (`133.6, -129.4` is our
+     start), then press Enter. CARLA's `Map.get_waypoint` finds the nearest lane point and
+     the window prints its road, lane and distance along the road `s`. Use this rather
+     than a click to get a position exactly: the drawn waypoints are 2 m apart;
+   - **click** a waypoint to see its road, lane and distance along the road.
+
+   Open `maps/Town01.xodr` in a text editor at the line it names.
 1. **graph**: every node (waypoint) of the graph, and in amber the 36 nodes with two
    successors: where a lane enters an intersection and the AV can go two ways. Click
    a node to print its position, heading, road, lane and successors.
