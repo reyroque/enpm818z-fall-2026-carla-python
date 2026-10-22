@@ -22,22 +22,28 @@ from matplotlib.widgets import Slider
 import l7common as c
 
 HERE = Path(__file__).resolve().parent
+# The slides' colors: light gray lanes, blue the shortest-distance route, rust the fastest
+# route, amber what a search took (in --part graph: the splits), red the obstacle, green the
+# new route.
 LANE, ROUTE, FAST, EXPANDED, BLOCK, NEW, INK = "#C3C9D2", "#2D6CA2", "#C2552F", "#E8A33D", "#C0392B", "#1E9E74", "#1E2939"
 
 
 def draw_lanes(ax, g, lw=1.0):
+    """Every edge of the graph as a short gray line: together they draw every lane."""
     xy = g["node_xy"]
-    seg = np.stack([xy[g["edge_from"]], xy[g["edge_to"]]], axis=1)
+    seg = np.stack([xy[g["edge_from"]], xy[g["edge_to"]]], axis=1)   # (edges, 2 ends, x y)
     from matplotlib.collections import LineCollection
     ax.add_collection(LineCollection(seg, colors=LANE, linewidths=lw, zorder=1))
 
 
 def draw_route(ax, g, route, color, lw=3.0, **kw):
+    """A route (a list of node indices, start to goal) as one line through its nodes."""
     xy = g["node_xy"][route]
     return ax.plot(xy[:, 0], xy[:, 1], color=color, lw=lw, zorder=4, **kw)[0]
 
 
 def start_goal(ax, g, s):
+    """Mark the trip's start S and goal G, the nodes saved in summary.json."""
     xy = g["node_xy"]
     for k, name in ((s["trip"]["start_node"], "S"), (s["trip"]["goal_node"], "G")):
         ax.plot(*xy[k], "o", ms=9, color=INK, zorder=6)
@@ -45,16 +51,20 @@ def start_goal(ax, g, s):
 
 
 def axes_map(ax, xlim=(-15, 410), ylim=(-345, 25)):
+    """Map axes in meters, the same scale on x and y so streets keep their shape.
+    The default limits show all of Town01."""
     ax.set_aspect("equal")
     ax.set_xlim(*xlim); ax.set_ylim(*ylim)
     ax.set_xlabel("x, east (m)"); ax.set_ylabel("y, north (m)")
 
 
 def part_graph(fig, g, r, s):
+    """Town01's waypoint graph. Amber nodes are splits: two edges leave them, one for each
+    way out of an intersection. Click any node to print where it is and where it leads."""
     ax = fig.add_subplot(111)
     draw_lanes(ax, g)
     xy = g["node_xy"]
-    two = np.bincount(g["edge_from"], minlength=len(xy)) == 2
+    two = np.bincount(g["edge_from"], minlength=len(xy)) == 2   # edges leaving each node: 2 = a split
     ax.scatter(*xy.T, s=4, color=INK, zorder=2)
     ax.scatter(*xy[two].T, s=30, color=EXPANDED, zorder=3, label="a node with two successors")
     gs = s["graph"]
@@ -68,8 +78,8 @@ def part_graph(fig, g, r, s):
     def on_click(ev):
         if ev.inaxes is not ax or ev.xdata is None:
             return
-        k = int(np.argmin(np.hypot(xy[:, 0] - ev.xdata, xy[:, 1] - ev.ydata)))
-        succ = g["edge_to"][g["edge_from"] == k]
+        k = int(np.argmin(np.hypot(xy[:, 0] - ev.xdata, xy[:, 1] - ev.ydata)))   # nearest node
+        succ = g["edge_to"][g["edge_from"] == k]                                 # where it leads
         lens = g["edge_len"][g["edge_from"] == k]
         info.set_text(f"node {k}: ({xy[k][0]:.1f}, {xy[k][1]:.1f}) m, heading {g['node_yaw_deg'][k]:.0f} deg, "
                       f"road {g['node_road'][k]}, lane {g['node_lane'][k]}"
@@ -80,6 +90,8 @@ def part_graph(fig, g, r, s):
 
 
 def part_costs(fig, g, r, s):
+    """The same trip searched with three edge costs (slides "Routes under three costs"):
+    distance (blue), travel time (rust, dashed) and distance plus a left-turn penalty."""
     ax = fig.add_subplot(111)
     draw_lanes(ax, g, lw=1.4)
     t = s["trip"]["routes"]
@@ -107,6 +119,8 @@ def part_search(fig, g, r, s):
         ax.route = draw_route(ax, g, r["route_distance"], ROUTE)
         ax.route.set_visible(False)
         axes_map(ax)
+    # One slider for both panels: at step k, each panel shows the first k nodes its search
+    # took. A* stops sooner (fewer nodes), so it shows its route while Dijkstra still runs.
     n = max(len(o) for o in orders.values())
     sax = fig.add_axes([0.15, 0.04, 0.7, 0.03])
     sl = Slider(sax, "step", 1, n, valinit=n, valstep=1)
@@ -122,16 +136,18 @@ def part_search(fig, g, r, s):
         fig.canvas.draw_idle()
     sl.on_changed(update)
     update(n)
-    fig._keep = sl
+    fig._keep = sl              # keep a reference, or Python deletes the slider and it stops
 
 
 def part_replan(fig, g, r, s):
+    """Re-planning (slide "An obstacle on the road from 5 to 6"): the old route from where the
+    AV saw the obstacle, the obstacle with its 3.0 m clearance circle, and the new route."""
     ax = fig.add_subplot(111)
     draw_lanes(ax, g, lw=1.4)
     xy = g["node_xy"]
     rp = s["replan"]
     old = r["route_distance"]
-    k0 = int(np.flatnonzero(old == rp["from_node"])[0])
+    k0 = int(np.flatnonzero(old == rp["from_node"])[0])     # where the AV is on the old route
     draw_route(ax, g, old[k0:], ROUTE, lw=6, label=f"old route, from the AV: {rp['old_rest_m']} m")
     draw_route(ax, g, r["replan_route"], NEW, lw=3, ls="--", label=f"new route: {rp['new_m']} m")
     o = s["chosen"]["obstacle_xy"]
@@ -159,6 +175,8 @@ def load_map():
     wps = m.generate_waypoints(2.0)
     lines = text.splitlines()
     roads = {d.get("id"): d for d in root.findall("road")}
+    # line_of[road id] = the line where that <road ...> starts in Town01.xodr, so the window
+    # can tell you which line of the file to open.
     line_of = {}
     for i, l in enumerate(lines, 1):
         if "<road " in l:
@@ -196,7 +214,7 @@ def map_search(query, M):
         25             the same as "road 25"
         133.6 -129.4   the lane point nearest to x = 133.6, y = -129.4 m (also "xy 133.6 -129.4")
     """
-    words = query.strip().lower().split()
+    words = query.strip().lower().split()      # "Road 25" -> ["road", "25"]
     if not words:
         return None, "type a search: road 25, lane 25 -1, junction 332, segment 12, waypoint 100"
     def number(s_):
@@ -205,15 +223,17 @@ def map_search(query, M):
             return True
         except ValueError:
             return False
+    # Two numbers with a decimal point are a position in meters, not an ID.
     if words[0] == "xy" or (len(words) == 2 and all(number(w_) for w_ in words)
                             and any("." in w_ for w_ in words)):
         vals = [float(w_.rstrip(",")) for w_ in (words[1:] if words[0] == "xy" else words)]
         if len(vals) != 2:
             return None, "type x and y in meters, e.g. 133.6 -129.4"
         return map_point(vals[0], vals[1], M)
-    if words[0].lstrip("-").isdigit():
+    if words[0].lstrip("-").isdigit():         # a bare number means a road ID
         words = ["road"] + words
     kind, args = words[0], words[1:]
+    # waypoints -> N x 2 positions in the map frame (CARLA's y points the other way)
     xy = lambda ws: np.array([[w.transform.location.x, -w.transform.location.y] for w in ws])
     try:
         nums = [int(x) for x in args]
@@ -252,8 +272,8 @@ def map_search(query, M):
         topo = M["topo"]
         if not 0 <= nums[0] < len(topo):
             return None, f"segments are numbered 0 to {len(topo) - 1}"
-        a, b = topo[nums[0]]
-        ws = [a] + a.next_until_lane_end(2.0)
+        a, b = topo[nums[0]]                       # the segment's two end waypoints
+        ws = [a] + a.next_until_lane_end(2.0)      # every 2 m from the start to the lane's end
         pts = np.vstack([xy(ws), xy([b])])
         length = float(np.hypot(*np.diff(pts, axis=0).T).sum())
         kind_ = "through junction %d" % a.junction_id if a.is_junction else "between intersections"
@@ -296,6 +316,7 @@ def part_map(fig, g, r, s):
     info = fig.text(0.08, 0.012, "click a waypoint, or search below", fontsize=9, va="bottom", wrap=True)
 
     def zoom(f, cx=None, cy=None):
+        """Scale the view by f around (cx, cy), the center of the view by default."""
         (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
         cx = 0.5 * (x0 + x1) if cx is None else cx
         cy = 0.5 * (y0 + y1) if cy is None else cy
@@ -308,6 +329,7 @@ def part_map(fig, g, r, s):
             zoom(0.8 if ev.button == "up" else 1.25, ev.xdata, ev.ydata)
 
     def show(pts, msg):
+        """Highlight what a search found and zoom to it, with a margin of at least 15 m."""
         info.set_text(msg)
         if pts is None:
             found.set_offsets(np.empty((0, 2)))
@@ -367,6 +389,7 @@ PARTS = {"map": part_map, "graph": part_graph, "costs": part_costs, "search": pa
 
 
 def main(argv=None):
+    """Read the options, load the graph and the saved results, and show one part."""
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--part", choices=list(PARTS), required=True)
     ap.add_argument("--snapshot")

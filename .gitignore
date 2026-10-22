@@ -27,3 +27,6 @@ lecture6/slam/figs/
 lecture6/slam/measured_*.json
 lecture6/slam/*_results.npz
 lecture6/slam/bow_similarity.npy
+
+# lecture7/osm_to_map.py: the map it writes into the folder it runs from
+my_area.xodr

@@ -27,7 +27,8 @@ python3 read_map.py
 "From your .osm file to a map, in Python". With no argument it converts
 `maps/umd_engineering.osm`, the campus around the Kim building (map data © OpenStreetMap
 contributors, ODbL), and prints 314 roads, 46 intersections and 9144 waypoints at 2 m. Give
-it your own export instead: `python3 osm_to_map.py my_area.osm`. It centers the projection
+it your own export instead: openstreetmap.org saves it as `map.osm`, so run
+`python3 osm_to_map.py ~/Downloads/map.osm` with the folder your browser saved it in. It centers the projection
 on the file's own area and writes `my_area.xodr`, which you read with `carla.Map` as
 Town01. The converter prints many warnings about map features it skips; they are normal.
 
