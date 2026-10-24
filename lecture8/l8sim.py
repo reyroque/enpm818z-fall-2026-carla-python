@@ -31,7 +31,7 @@ SIG_V = 1.0       # m/s, how far a driver's speed may differ from a mode's (chos
 B_EXP = 1.0       # m/s^2, the braking we expect before a turn (chosen)
 SIG_TH = np.radians(8.0)   # rad, same for heading (chosen)
 SIG_LAT = 0.7     # m, same for the sideways offset from a lane's center (chosen)
-SIG_ACC = 0.5     # m/s^2 per sqrt(s): how fast speed may wander, for CV's uncertainty (chosen)
+SIG_ACC = 0.5     # m/s per sqrt(s): how fast speed may wander, for CV's uncertainty (chosen)
 GAP = 4.1         # s, the shortest gap a left-turning driver accepts (critical gap)
 D_DECIDE = 6.0    # m before the junction where car A decides to turn or wait (chosen)
 
