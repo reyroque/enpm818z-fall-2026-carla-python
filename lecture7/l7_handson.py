@@ -1,7 +1,7 @@
 """L7 hands-on: one Town01 trip, from the map file to a route. Five parts.
 
   python3 l7_handson.py --part map      # Town01's map file: zoom, search a road, lane, junction, segment
-  python3 l7_handson.py --part graph    # Town01's waypoint graph; click a node to see it
+  python3 l7_handson.py --part graph    # Town01's waypoint graph; scroll to zoom, click a node
   python3 l7_handson.py --part costs    # every edge's three costs; the trip's route under each
   python3 l7_handson.py --part search   # Dijkstra and A*, replayed step by step (slider)
   python3 l7_handson.py --part replan   # an obstacle on the route, and the new route
@@ -58,35 +58,71 @@ def axes_map(ax, xlim=(-15, 410), ylim=(-345, 25)):
     ax.set_xlabel("x, east (m)"); ax.set_ylabel("y, north (m)")
 
 
-def part_graph(fig, g, r, s):
-    """Town01's waypoint graph. Amber nodes are splits: two edges leave them, one for each
-    way out of an intersection. Click any node to print where it is and where it leads."""
+def part_graph(fig, g, r, s, zoom_below_m=120.0):
+    """Town01's waypoint graph, the real one: 3107 nodes, 3143 edges. Seen whole, the nodes
+    are 2 m apart and too close to tell apart, so the window shows the lanes (gray) and the
+    splits (amber: two edges leave the node, one for each way out of an intersection).
+    Scroll to zoom in at the mouse: below zoom_below_m across, every node is a dot and every
+    edge an arrow, pointing the way the AV drives. Click a node to print where it is and
+    where it leads."""
     ax = fig.add_subplot(111)
-    draw_lanes(ax, g)
-    xy = g["node_xy"]
-    two = np.bincount(g["edge_from"], minlength=len(xy)) == 2   # edges leaving each node: 2 = a split
-    ax.scatter(*xy.T, s=4, color=INK, zorder=2)
-    ax.scatter(*xy[two].T, s=30, color=EXPANDED, zorder=3, label="a node with two successors")
+    draw_lanes(ax, g, lw=1.4)
+    xy, ef, et = g["node_xy"], g["edge_from"], g["edge_to"]
+    two = np.bincount(ef, minlength=len(xy)) == 2           # edges leaving each node: 2 = a split
+    ax.scatter(*xy[two].T, s=30, color=EXPANDED, zorder=4, label="a split: a node with two successors")
     gs = s["graph"]
     ax.set_title(f"Town01 at 2 m: {gs['nodes']} nodes, {gs['edges']} directed edges, "
-                 f"{gs['total_lane_length_m'] / 1000:.1f} km of lane", fontsize=12)
-    ax.legend(loc="upper right")
+                 f"{gs['total_lane_length_m'] / 1000:.1f} km of lane\n"
+                 "scroll to zoom in: dots are nodes, arrows are edges; click a node", fontsize=11)
+    ax.legend(loc="upper right", fontsize=10)
     axes_map(ax)
     info = ax.text(0.01, 0.01, "click a node", transform=ax.transAxes, fontsize=10, va="bottom",
                    bbox=dict(fc="white", ec=LANE))
+    close_up = []                                             # the dots and arrows now drawn
+
+    def draw_close_up(_=None):
+        """Draw nodes and edge arrows inside the view, only when the view is small enough."""
+        for artist in close_up:
+            artist.remove()
+        close_up.clear()
+        (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
+        if x1 - x0 > zoom_below_m:
+            return
+        inside = (xy[:, 0] >= x0) & (xy[:, 0] <= x1) & (xy[:, 1] >= y0) & (xy[:, 1] <= y1)
+        e = inside[ef] | inside[et]                           # edges with an end in view
+        d = xy[et[e]] - xy[ef[e]]
+        # each edge as an arrow from its node toward the next, 15 % shorter so the nodes show
+        close_up.append(ax.quiver(*(xy[ef[e]] + 0.075 * d).T, *(0.85 * d).T, angles="xy",
+                                  scale_units="xy", scale=1, color="#6B7380", width=0.003,
+                                  headwidth=5, headlength=6, headaxislength=5, zorder=2))
+        close_up.append(ax.scatter(*xy[inside].T, s=14, color=INK, zorder=3))
+
+    ax.callbacks.connect("xlim_changed", draw_close_up)
+
+    def on_scroll(ev):
+        """Zoom in (wheel up) or out at the mouse, by 20 % a step."""
+        if ev.inaxes is not ax or ev.xdata is None:
+            return
+        f = 0.8 if ev.button == "up" else 1.25
+        (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
+        ax.set_ylim(ev.ydata - (ev.ydata - y0) * f, ev.ydata + (y1 - ev.ydata) * f)
+        ax.set_xlim(ev.xdata - (ev.xdata - x0) * f, ev.xdata + (x1 - ev.xdata) * f)
+        fig.canvas.draw_idle()
 
     def on_click(ev):
         if ev.inaxes is not ax or ev.xdata is None:
             return
         k = int(np.argmin(np.hypot(xy[:, 0] - ev.xdata, xy[:, 1] - ev.ydata)))   # nearest node
-        succ = g["edge_to"][g["edge_from"] == k]                                 # where it leads
-        lens = g["edge_len"][g["edge_from"] == k]
+        succ = et[ef == k]                                                         # where it leads
+        lens = g["edge_len"][ef == k]
         info.set_text(f"node {k}: ({xy[k][0]:.1f}, {xy[k][1]:.1f}) m, heading {g['node_yaw_deg'][k]:.0f} deg, "
                       f"road {g['node_road'][k]}, lane {g['node_lane'][k]}"
                       + (" (in an intersection)" if g["node_junction"][k] else "")
-                      + "\nsuccessors: " + ", ".join(f"{int(a)} ({b:.2f} m)" for a, b in zip(succ, lens)))
+                      + "\nsuccessors: " + ", ".join(f"node {int(a)} ({b:.2f} m)" for a, b in zip(succ, lens)))
         fig.canvas.draw_idle()
+    fig.canvas.mpl_connect("scroll_event", on_scroll)
     fig.canvas.mpl_connect("button_press_event", on_click)
+    fig._l7_close_up = draw_close_up                          # lets a script draw a zoomed still
 
 
 def part_costs(fig, g, r, s):

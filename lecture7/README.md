@@ -6,7 +6,7 @@ server, no ROS, no GPU. The `map` part also needs CARLA's Python package,
 
 ```bash
 python3 l7_handson.py --part map      # 0. Town01's map file: zoom, search, click
-python3 l7_handson.py --part graph    # 1. Town01's waypoint graph; click a node
+python3 l7_handson.py --part graph    # 1. Town01's waypoint graph; scroll to zoom, click a node
 python3 l7_handson.py --part costs    # 2. every edge's three costs, and the trip's route under each
 python3 l7_handson.py --part search   # 3. Dijkstra and A*, replayed with a slider
 python3 l7_handson.py --part replan   # 4. an obstacle on the route, and the new route
@@ -66,9 +66,12 @@ Task 1 asks you to write A* on CARLA's waypoint graph yourself.
    - **click** a waypoint to see its road, lane and distance along the road.
 
    Open `maps/Town01.xodr` in a text editor at the line it names.
-1. **graph**: every node (waypoint) of the graph, and in amber the 36 nodes with two
-   successors: where a lane enters an intersection and the AV can go two ways. Click
-   a node to print its position, heading, road, lane and successors.
+1. **graph**: the real graph, 3107 nodes and 3143 edges. Seen whole, the nodes are 2 m
+   apart and too close to tell apart, so the window shows the lanes in gray and, in
+   amber, the 36 nodes with two successors: where a lane enters an intersection and the
+   AV can go two ways. Scroll to zoom in at the mouse: once the view is under 120 m
+   across, every node is a dot and every edge an arrow, pointing the way the AV drives.
+   Click a node to print its position, heading, road, lane and successors.
 2. **costs**: on the left, every edge of Town01, darker where one meter takes longer (the
    AV slows in a turn), with the 24 left-turn edges ringed. Click an edge to print its
    three costs: its length, its travel time (length divided by speed), and its length
