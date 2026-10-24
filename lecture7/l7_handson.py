@@ -58,6 +58,52 @@ def axes_map(ax, xlim=(-15, 410), ylim=(-345, 25)):
     ax.set_xlabel("x, east (m)"); ax.set_ylabel("y, north (m)")
 
 
+def zoom_and_pan(fig, ax, on_click):
+    """Mouse wheel: zoom in or out at the mouse, 20 % a step. Left-button drag: pan. A press and
+    release without moving (a few pixels of jitter allowed) is a click, passed to on_click."""
+    drag = {}                                                 # the press that may start a pan
+
+    def on_scroll(ev):
+        if ev.inaxes is not ax or ev.xdata is None:
+            return
+        f = 0.8 if ev.button == "up" else 1.25
+        (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
+        ax.set_ylim(ev.ydata - (ev.ydata - y0) * f, ev.ydata + (y1 - ev.ydata) * f)
+        ax.set_xlim(ev.xdata - (ev.xdata - x0) * f, ev.xdata + (x1 - ev.xdata) * f)
+        fig.canvas.draw_idle()
+
+    def on_press(ev):
+        if ev.inaxes is ax and ev.button == 1:
+            drag.update(x=ev.x, y=ev.y, xlim=ax.get_xlim(), ylim=ax.get_ylim(), moved=False)
+
+    def on_motion(ev):
+        """Move the view with the mouse while the left button is held (screen pixels to meters)."""
+        if not drag or ev.x is None:
+            return
+        dx, dy = ev.x - drag["x"], ev.y - drag["y"]
+        if not drag["moved"] and abs(dx) + abs(dy) < 5:
+            return
+        drag["moved"] = True
+        (x0, x1), (y0, y1) = drag["xlim"], drag["ylim"]
+        mx, my = (x1 - x0) / ax.bbox.width, (y1 - y0) / ax.bbox.height   # meters per pixel
+        ax.set_ylim(y0 - dy * my, y1 - dy * my)
+        ax.set_xlim(x0 - dx * mx, x1 - dx * mx)
+        fig.canvas.draw_idle()
+
+    def on_release(ev):
+        if not drag:
+            return
+        moved = drag["moved"]
+        drag.clear()
+        if not moved:
+            on_click(ev)
+
+    fig.canvas.mpl_connect("scroll_event", on_scroll)
+    fig.canvas.mpl_connect("button_press_event", on_press)
+    fig.canvas.mpl_connect("motion_notify_event", on_motion)
+    fig.canvas.mpl_connect("button_release_event", on_release)
+
+
 def part_graph(fig, g, r, s, zoom_below_m=120.0):
     """Town01's waypoint graph, the real one: 3107 nodes, 3143 edges. Seen whole, the nodes
     are 2 m apart and too close to tell apart, so the window shows the lanes (gray) and the
@@ -107,45 +153,6 @@ def part_graph(fig, g, r, s, zoom_below_m=120.0):
 
     ax.callbacks.connect("xlim_changed", draw_close_up)
 
-    def on_scroll(ev):
-        """Zoom in (wheel up) or out at the mouse, by 20 % a step."""
-        if ev.inaxes is not ax or ev.xdata is None:
-            return
-        f = 0.8 if ev.button == "up" else 1.25
-        (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
-        ax.set_ylim(ev.ydata - (ev.ydata - y0) * f, ev.ydata + (y1 - ev.ydata) * f)
-        ax.set_xlim(ev.xdata - (ev.xdata - x0) * f, ev.xdata + (x1 - ev.xdata) * f)
-        fig.canvas.draw_idle()
-
-    drag = {}                                                 # the press that may start a pan
-
-    def on_press(ev):
-        if ev.inaxes is ax and ev.button == 1:
-            drag.update(x=ev.x, y=ev.y, xlim=ax.get_xlim(), ylim=ax.get_ylim(), moved=False)
-
-    def on_motion(ev):
-        """Move the view with the mouse while the left button is held (screen pixels to meters)."""
-        if not drag or ev.x is None:
-            return
-        dx, dy = ev.x - drag["x"], ev.y - drag["y"]
-        if not drag["moved"] and abs(dx) + abs(dy) < 5:     # a few pixels of jitter is still a click
-            return
-        drag["moved"] = True
-        (x0, x1), (y0, y1) = drag["xlim"], drag["ylim"]
-        mx, my = (x1 - x0) / ax.bbox.width, (y1 - y0) / ax.bbox.height   # meters per pixel
-        ax.set_ylim(y0 - dy * my, y1 - dy * my)
-        ax.set_xlim(x0 - dx * mx, x1 - dx * mx)
-        fig.canvas.draw_idle()
-
-    def on_release(ev):
-        """A release after a pan ends it; a release without moving is a click on a node."""
-        if not drag:
-            return
-        moved = drag["moved"]
-        drag.clear()
-        if not moved:
-            on_click(ev)
-
     def parting(k, succ):
         """For a split: how far apart its two successors are, and how far on the two ways part."""
         p, q = int(succ[0]), int(succ[1])
@@ -163,6 +170,19 @@ def part_graph(fig, g, r, s, zoom_below_m=120.0):
         if ev.inaxes is not ax or ev.xdata is None:
             return
         k = int(np.argmin(np.hypot(xy[:, 0] - ev.xdata, xy[:, 1] - ev.ydata)))   # nearest node
+        here = np.flatnonzero(where.ravel() == where.ravel()[k])   # every node at that point (ringed: 2)
+        if len(here) > 1:
+            lines = [f"{len(here)} nodes at ({xy[k][0]:.1f}, {xy[k][1]:.1f}) m, one for each way (ringed):"]
+            for n in here:
+                nxt = et[ef == n]
+                lines.append(f"  node {n}: road {g['node_road'][n]}, lane {g['node_lane'][n]}, successor "
+                             + ", ".join(f"node {int(a)} ({b:.2f} m)" for a, b in zip(nxt, g["edge_len"][ef == n])))
+            before = sorted({int(p) for n in here for p in ef[et == n]})
+            if len(before) == 1:
+                lines.append(f"  both follow node {before[0]}, the split before them")
+            info.set_text("\n".join(lines))
+            fig.canvas.draw_idle()
+            return
         succ = et[ef == k]                                                         # where it leads
         lens = g["edge_len"][ef == k]
         text = (f"node {k}: ({xy[k][0]:.1f}, {xy[k][1]:.1f}) m, heading {g['node_yaw_deg'][k]:.0f} deg, "
@@ -173,10 +193,7 @@ def part_graph(fig, g, r, s, zoom_below_m=120.0):
             text += "\n" + parting(k, succ)
         info.set_text(text)
         fig.canvas.draw_idle()
-    fig.canvas.mpl_connect("scroll_event", on_scroll)
-    fig.canvas.mpl_connect("button_press_event", on_press)
-    fig.canvas.mpl_connect("motion_notify_event", on_motion)
-    fig.canvas.mpl_connect("button_release_event", on_release)
+    zoom_and_pan(fig, ax, on_click)
     fig._l7_close_up = draw_close_up                          # lets a script draw a zoomed still
 
 
@@ -204,10 +221,10 @@ def part_costs(fig, g, r, s):
     ax.scatter(*mid[left].T, s=80, facecolors="none", edgecolors=INK, linewidths=1.4, zorder=3,
                label=f"left turn: {penalty:.0f} m added in the penalty cost")
     ax.legend(loc="upper right", fontsize=9)
-    ax.set_title("The cost of every edge: click one", fontsize=12)
+    ax.set_title("The cost of every edge: scroll to zoom, drag to pan, click one", fontsize=12)
     axes_map(ax)
     picked, = ax.plot([], [], color=INK, lw=6, solid_capstyle="round", zorder=4)
-    info = fig.text(0.02, 0.01, "click an edge", fontsize=9, va="bottom", family="monospace",
+    info = fig.text(0.55, 0.01, "click an edge", fontsize=9, va="bottom", family="monospace",
                     bbox=dict(fc="white", ec=LANE))
     v_lim = s["graph"]["speed_limit_mps"]
 
@@ -218,20 +235,17 @@ def part_costs(fig, g, r, s):
         # the nearest edge, and any edge on top of it: where a lane splits, the first edges
         # of "straight on" and "turn" can leave the same node along the same first meters
         near = np.flatnonzero(d <= d.min() + 0.05)
-        text = []
+        text = ["each edge here: distance cost | travel-time cost | left-turn penalty cost"]
         for i in near:
             length = r["edge_cost_distance"][i]
-            why = "the speed limit" if v[i] >= v_lim - 1e-6 else "slowed by the curve"
-            text.append(f"edge {i}: node {ef[i]} -> node {et[i]}" + ("  (a left turn)" if left[i] else "") + "\n"
-                        f"  distance cost:     {length:6.2f} m\n"
-                        f"  travel-time cost:  {length:6.2f} m / {v[i]:5.2f} m/s = {r['edge_cost_time'][i]:.3f} s"
-                        f"  ({why})\n"
-                        f"  left-turn cost:    {length:6.2f} m + {penalty if left[i] else 0:.0f} m"
-                        f" = {r['edge_cost_left'][i]:.2f} m")
+            why = "speed limit" if v[i] >= v_lim - 1e-6 else "slowed by the curve"
+            text.append(f"edge {i}, node {ef[i]} -> node {et[i]}" + ("  (a left turn)" if left[i] else ""))
+            text.append(f"  {length:.2f} m | {length:.2f} m / {v[i]:.2f} m/s = {r['edge_cost_time'][i]:.3f} s"
+                        f" ({why}) | {length:.2f} + {penalty if left[i] else 0:.0f} = {r['edge_cost_left'][i]:.2f} m")
         info.set_text("\n".join(text))
         picked.set_data(*seg[near[0]].T)
         fig.canvas.draw_idle()
-    fig.canvas.mpl_connect("button_press_event", on_click)
+    zoom_and_pan(fig, ax, on_click)
 
     ax_routes = fig.add_subplot(grid[1])      # its own name: on_click above uses ax
     draw_lanes(ax_routes, g, lw=1.4)

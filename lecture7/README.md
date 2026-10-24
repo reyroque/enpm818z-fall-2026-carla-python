@@ -75,9 +75,10 @@ Task 1 asks you to write A* on CARLA's waypoint graph yourself.
    because the two ways out of an intersection leave along the same line and part a few
    meters on: an amber ring marks every point that holds two nodes. Click a node (press
    and release without moving) to print its position, heading, road, lane and
-   successors; for a split, also how far on its two ways part.
+   successors; for a split, also how far on its two ways part. A click on a ring lists
+   both of its nodes, one for each way, and the split they follow.
 2. **costs**: on the left, every edge of Town01, darker where one meter takes longer (the
-   AV slows in a turn), with the 24 left-turn edges ringed. Click an edge to print its
+   AV slows in a turn), with the 24 left-turn edges ringed. Scroll to zoom, drag to pan. Click an edge to print its
    three costs: its length, its travel time (length divided by speed), and its length
    plus 30 m if it is a left turn. Where a lane splits, two edges leave the same node
    along the same first meters; the click lists both. On the right, the same start and
