@@ -93,6 +93,24 @@ Task 1 asks you to write A* on CARLA's waypoint graph yourself.
    seen when the AV is 23 m before intersection 171. The edges within 3.0 m of it are
    closed (GP4's `obstacle_clearance`), and the route from the AV is planned again.
 
+## Optional: the search in Rerun
+
+`rerun_search.py` replays the same two searches as `--part search` in the
+[Rerun](https://rerun.io) viewer, if you want to try it. Rerun is not needed for the
+lecture: its package and viewer take several hundred megabytes.
+
+```bash
+pip install rerun-sdk
+python3 rerun_search.py
+```
+
+Drag the time slider at the bottom, or press play, to watch both searches take their
+nodes; the route appears when a search reaches G. Scroll to zoom and drag to pan in each
+view. The plot under the maps shows how many nodes each search has taken by each step.
+Rerun's 2D views point y down, so the script flips y: north stays up, and the axis shows
+130 where the map has y = -130 m. `python3 rerun_search.py --save search.rrd` writes a
+recording instead, which `rerun search.rrd` opens.
+
 ## The data
 
 `maps/Town01.xodr` is CARLA 0.9.16's map file for Town01, unchanged. CARLA's assets
