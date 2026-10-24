@@ -25,5 +25,5 @@ segs = m.get_topology()                  # (start, end) waypoint pairs: one lane
 
 lights = text.count('type="1000001"')    # OpenDRIVE's signal type code for a traffic light
 print(f"waypoints at 2 m, len(wps): {len(wps)}")
-print(f"topology segments, len(segs): {len(segs)}")
+print(f"(start, end) waypoint pairs, len(segs): {len(segs)}")
 print(f"traffic lights in the file: {lights}")

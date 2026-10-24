@@ -457,7 +457,7 @@ def part_map(fig, g, r, s):
     print(f"Town01.xodr: {len(text.splitlines())} lines; {len(roads)} roads, {len(in_j)} of them inside the "
           f"{len(root.findall('junction'))} junctions ({len(drive_j)} with a driving lane); "
           f"{len(lights)} traffic lights")
-    print(f"carla.Map: {len(wps)} waypoints at 2 m, {len(M['topo'])} topology segments")
+    print(f"carla.Map: {len(wps)} waypoints at 2 m, {len(M['topo'])} waypoint pairs from get_topology()")
     xy = np.array([[w.transform.location.x, -w.transform.location.y] for w in wps])
     jn = np.array([w.is_junction for w in wps])
     ax = fig.add_axes([0.08, 0.2, 0.9, 0.74])

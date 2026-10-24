@@ -16,7 +16,8 @@ Add `--snapshot out.png` to save a still instead of opening a window, or
 `--html out.html` for a web page (needs `pip install mpld3`).
 
 The code on the slide "Read the map file yourself" is `read_map.py`. It prints the
-slide's three counts (3266 waypoints, 160 topology segments, 36 traffic lights). Like
+slide's three counts (3266 waypoints, 160 waypoint pairs from `get_topology()`, 36 traffic
+lights). Like
 the `map` part, it needs CARLA's Python package and no server:
 
 ```bash
@@ -50,12 +51,12 @@ Task 1 asks you to write A* on CARLA's waypoint graph yourself.
 0. **map**: reads `maps/Town01.xodr`, CARLA's map file for Town01, with
    `carla.Map("Town01", text)` and no server. It prints what the file holds (122 roads,
    96 of them inside the 12 intersections, 36 traffic lights) and what CARLA makes of
-   it (3266 waypoints at 2 m, 160 topology segments), and draws every waypoint. In the
+   it (3266 waypoints at 2 m, 160 waypoint pairs from `get_topology()`), and draws every waypoint. In the
    window:
    - **zoom** with the mouse wheel (at the cursor) or the Zoom in, Zoom out and Whole map
      buttons;
    - **search** in the box, then press Enter: `road 25` (or just `25`), `lane 25 -1`,
-     `junction 332`, `segment 12` (one of the 160 topology segments, 0 to 159) or
+     `junction 332`, `segment 12` (one of the 160 waypoint pairs from `get_topology()`, 0 to 159) or
      `waypoint 100`. The match turns pink, the view zooms to it, and the line below says
      what the file holds about it: a road's length, its ends and the line of
      `Town01.xodr` where it starts;
