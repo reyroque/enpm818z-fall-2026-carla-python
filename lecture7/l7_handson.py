@@ -69,7 +69,13 @@ def part_graph(fig, g, r, s, zoom_below_m=120.0):
     draw_lanes(ax, g, lw=1.4)
     xy, ef, et = g["node_xy"], g["edge_from"], g["edge_to"]
     two = np.bincount(ef, minlength=len(xy)) == 2           # edges leaving each node: 2 = a split
+    # nodes that share their point with another node: mostly a split's two successors, because
+    # the ways out of an intersection leave along the same line and part a few meters on
+    _, where, count = np.unique(np.round(xy, 2), axis=0, return_inverse=True, return_counts=True)
+    stacked = count[where.ravel()] > 1
     ax.scatter(*xy[two].T, s=30, color=EXPANDED, zorder=4, label="a split: a node with two successors")
+    ax.scatter([], [], s=70, facecolors="none", edgecolors=EXPANDED, linewidths=1.5,
+               label="two nodes at one point (a split's two ways start together)")
     gs = s["graph"]
     ax.set_title(f"Town01 at 2 m: {gs['nodes']} nodes, {gs['edges']} directed edges, "
                  f"{gs['total_lane_length_m'] / 1000:.1f} km of lane\n"
@@ -96,6 +102,8 @@ def part_graph(fig, g, r, s, zoom_below_m=120.0):
                                   scale_units="xy", scale=1, color="#6B7380", width=0.003,
                                   headwidth=5, headlength=6, headaxislength=5, zorder=2))
         close_up.append(ax.scatter(*xy[inside].T, s=14, color=INK, zorder=3))
+        close_up.append(ax.scatter(*xy[inside & stacked].T, s=70, facecolors="none", edgecolors=EXPANDED,
+                                   linewidths=1.5, zorder=4))
 
     ax.callbacks.connect("xlim_changed", draw_close_up)
 
@@ -138,16 +146,32 @@ def part_graph(fig, g, r, s, zoom_below_m=120.0):
         if not moved:
             on_click(ev)
 
+    def parting(k, succ):
+        """For a split: how far apart its two successors are, and how far on the two ways part."""
+        p, q = int(succ[0]), int(succ[1])
+        gap = float(np.hypot(*(xy[p] - xy[q])))
+        along = float(g["edge_len"][(ef == k) & (et == p)][0])          # from the split to p
+        for _ in range(30):                                   # follow both ways, one node at a time
+            if np.hypot(*(xy[p] - xy[q])) > 1.0:
+                break
+            along += float(g["edge_len"][ef == p][0])
+            p, q = int(et[ef == p][0]), int(et[ef == q][0])
+        return (f"the two successors are {gap:.2f} m apart (ringed); the two ways are more than "
+                f"1 m apart about {along:.0f} m after this node")
+
     def on_click(ev):
         if ev.inaxes is not ax or ev.xdata is None:
             return
         k = int(np.argmin(np.hypot(xy[:, 0] - ev.xdata, xy[:, 1] - ev.ydata)))   # nearest node
         succ = et[ef == k]                                                         # where it leads
         lens = g["edge_len"][ef == k]
-        info.set_text(f"node {k}: ({xy[k][0]:.1f}, {xy[k][1]:.1f}) m, heading {g['node_yaw_deg'][k]:.0f} deg, "
-                      f"road {g['node_road'][k]}, lane {g['node_lane'][k]}"
-                      + (" (in an intersection)" if g["node_junction"][k] else "")
-                      + "\nsuccessors: " + ", ".join(f"node {int(a)} ({b:.2f} m)" for a, b in zip(succ, lens)))
+        text = (f"node {k}: ({xy[k][0]:.1f}, {xy[k][1]:.1f}) m, heading {g['node_yaw_deg'][k]:.0f} deg, "
+                f"road {g['node_road'][k]}, lane {g['node_lane'][k]}"
+                + (" (in an intersection)" if g["node_junction"][k] else "")
+                + "\nsuccessors: " + ", ".join(f"node {int(a)} ({b:.2f} m)" for a, b in zip(succ, lens)))
+        if len(succ) == 2:
+            text += "\n" + parting(k, succ)
+        info.set_text(text)
         fig.canvas.draw_idle()
     fig.canvas.mpl_connect("scroll_event", on_scroll)
     fig.canvas.mpl_connect("button_press_event", on_press)

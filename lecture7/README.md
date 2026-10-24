@@ -71,8 +71,11 @@ Task 1 asks you to write A* on CARLA's waypoint graph yourself.
    amber, the 36 nodes with two successors: where a lane enters an intersection and the
    AV can go two ways. Scroll to zoom in at the mouse, and drag with the left button to
    pan: once the view is under 120 m across, every node is a dot and every edge an arrow,
-   pointing the way the AV drives. Click a node (press and release without moving) to
-   print its position, heading, road, lane and successors.
+   pointing the way the AV drives. A split's two successors usually sit at one point,
+   because the two ways out of an intersection leave along the same line and part a few
+   meters on: an amber ring marks every point that holds two nodes. Click a node (press
+   and release without moving) to print its position, heading, road, lane and
+   successors; for a split, also how far on its two ways part.
 2. **costs**: on the left, every edge of Town01, darker where one meter takes longer (the
    AV slows in a turn), with the 24 left-turn edges ringed. Click an edge to print its
    three costs: its length, its travel time (length divided by speed), and its length
