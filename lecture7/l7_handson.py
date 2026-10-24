@@ -2,7 +2,7 @@
 
   python3 l7_handson.py --part map      # Town01's map file: zoom, search a road, lane, junction, segment
   python3 l7_handson.py --part graph    # Town01's waypoint graph; click a node to see it
-  python3 l7_handson.py --part costs    # the trip's route under three edge costs
+  python3 l7_handson.py --part costs    # every edge's three costs; the trip's route under each
   python3 l7_handson.py --part search   # Dijkstra and A*, replayed step by step (slider)
   python3 l7_handson.py --part replan   # an obstacle on the route, and the new route
 Add --snapshot out.png to save a still, --html out.html for a page (needs mpld3).
@@ -90,20 +90,71 @@ def part_graph(fig, g, r, s):
 
 
 def part_costs(fig, g, r, s):
-    """The same trip searched with three edge costs (slides "Routes under three costs"):
-    distance (blue), travel time (rust, dashed) and distance plus a left-turn penalty."""
-    ax = fig.add_subplot(111)
-    draw_lanes(ax, g, lw=1.4)
+    """Left: every edge of Town01, darker where one meter takes longer (the travel-time cost
+    of a meter, 1/v), with the left-turn edges ringed. Click an edge to print its three
+    costs. Right: the trip searched with each cost (slide "Routes under three costs").
+    The costs were computed in advance and saved in l7_results/routes.npz: choosing and
+    computing your own cost is part of GP4."""
+    from matplotlib.collections import LineCollection
+    grid = fig.add_gridspec(1, 2, width_ratios=[1.35, 1], bottom=0.2)
+    ax = fig.add_subplot(grid[0])
+    xy, ef, et = g["node_xy"], g["edge_from"], g["edge_to"]
+    seg = np.stack([xy[ef], xy[et]], axis=1)             # (edges, 2 ends, x y)
+    mid = seg.mean(axis=1)                               # where a click finds an edge
+    v, left = r["edge_speed"], r["edge_left_turn"]
+    per_m = 1.0 / v                                      # seconds to drive one meter of the edge
+    penalty = s["chosen"]["left_penalty_m"]
+    lines = LineCollection(seg, cmap="Greys", linewidths=2.2, zorder=2)
+    lines.set_array(per_m)
+    lines.set_clim(0.0, per_m.max())                     # from 0, so the straight lanes stay visible
+    ax.add_collection(lines)
+    bar = fig.colorbar(lines, ax=ax, orientation="horizontal", fraction=0.035, pad=0.09)
+    bar.set_label("seconds to drive one meter, 1/v: dark where the AV slows in a turn")
+    ax.scatter(*mid[left].T, s=80, facecolors="none", edgecolors=INK, linewidths=1.4, zorder=3,
+               label=f"left turn: {penalty:.0f} m added in the penalty cost")
+    ax.legend(loc="upper right", fontsize=9)
+    ax.set_title("The cost of every edge: click one", fontsize=12)
+    axes_map(ax)
+    picked, = ax.plot([], [], color=INK, lw=6, solid_capstyle="round", zorder=4)
+    info = fig.text(0.02, 0.01, "click an edge", fontsize=9, va="bottom", family="monospace",
+                    bbox=dict(fc="white", ec=LANE))
+    v_lim = s["graph"]["speed_limit_mps"]
+
+    def on_click(ev):
+        if ev.inaxes is not ax or ev.xdata is None:
+            return
+        d = np.hypot(mid[:, 0] - ev.xdata, mid[:, 1] - ev.ydata)
+        # the nearest edge, and any edge on top of it: where a lane splits, the first edges
+        # of "straight on" and "turn" can leave the same node along the same first meters
+        near = np.flatnonzero(d <= d.min() + 0.05)
+        text = []
+        for i in near:
+            length = r["edge_cost_distance"][i]
+            why = "the speed limit" if v[i] >= v_lim - 1e-6 else "slowed by the curve"
+            text.append(f"edge {i}: node {ef[i]} -> node {et[i]}" + ("  (a left turn)" if left[i] else "") + "\n"
+                        f"  distance cost:     {length:6.2f} m\n"
+                        f"  travel-time cost:  {length:6.2f} m / {v[i]:5.2f} m/s = {r['edge_cost_time'][i]:.3f} s"
+                        f"  ({why})\n"
+                        f"  left-turn cost:    {length:6.2f} m + {penalty if left[i] else 0:.0f} m"
+                        f" = {r['edge_cost_left'][i]:.2f} m")
+        info.set_text("\n".join(text))
+        picked.set_data(*seg[near[0]].T)
+        fig.canvas.draw_idle()
+    fig.canvas.mpl_connect("button_press_event", on_click)
+
+    ax_routes = fig.add_subplot(grid[1])      # its own name: on_click above uses ax
+    draw_lanes(ax_routes, g, lw=1.4)
     t = s["trip"]["routes"]
-    draw_route(ax, g, r["route_distance"], ROUTE, lw=6,
+    draw_route(ax_routes, g, r["route_distance"], ROUTE, lw=6,
                label=f"cost = distance: {t['distance']['length_m']} m, {t['distance']['time_s']} s")
-    draw_route(ax, g, r["route_time"], FAST, lw=3, ls="--",
+    draw_route(ax_routes, g, r["route_time"], FAST, lw=3, ls="--",
                label=f"cost = travel time: {t['time']['length_m']} m, {t['time']['time_s']} s")
-    draw_route(ax, g, r["route_left_penalty"], INK, lw=1.2, ls=":",
-               label=f"cost = distance + {s['chosen']['left_penalty_m']:.0f} m per left turn: same as travel time")
-    start_goal(ax, g, s)
-    ax.legend(loc="lower right", fontsize=10)
-    axes_map(ax, (60, 225), (-215, 25))
+    draw_route(ax_routes, g, r["route_left_penalty"], INK, lw=1.2, ls=":",
+               label=f"cost = distance + {penalty:.0f} m per left turn: same as travel time")
+    start_goal(ax_routes, g, s)
+    ax_routes.set_title("The trip, searched once with each cost", fontsize=12)
+    ax_routes.legend(loc="lower right", fontsize=9)
+    axes_map(ax_routes, (60, 225), (-215, 25))
 
 
 def part_search(fig, g, r, s):
@@ -397,7 +448,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     g = c.load_graph()
     r, s = c.load_results()
-    fig = plt.figure(figsize=(12, 8) if a.part == "search" else (10, 8))
+    fig = plt.figure(figsize={"search": (12, 8), "costs": (16, 9.5)}.get(a.part, (10, 8)))
     PARTS[a.part](fig, g, r, s)
     if a.snapshot:
         fig.savefig(a.snapshot, dpi=110, facecolor="white")

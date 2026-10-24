@@ -34,6 +34,24 @@ def test_lengths_match_summary(data):
     assert abs(c.route_length(g, r["replan_route"]) - s["replan"]["new_m"]) < 0.1
 
 
+def test_edge_costs_add_up_to_each_route(data):
+    """The saved edge costs (for --part costs), summed along each route, give the summary's
+    length, time and cost: the per-edge numbers and the route numbers come from one model."""
+    g, r, s = data
+    lut = c.edge_lookup(g)
+    assert np.allclose(r["edge_cost_distance"], g["edge_len"])
+    for name in ("distance", "time", "left_penalty"):
+        route = r[f"route_{name}"]
+        idx = [lut[(int(a), int(b))] for a, b in zip(route[:-1], route[1:])]
+        t = s["trip"]["routes"][name]
+        assert round(float(r["edge_cost_distance"][idx].sum()), 1) == t["length_m"]
+        assert round(float(r["edge_cost_time"][idx].sum()), 1) == t["time_s"]
+        assert int(r["edge_left_turn"][idx].sum()) == t["left_turns"]
+    assert round(float(r["edge_cost_left"][[lut[(int(a), int(b))] for a, b in
+                 zip(r["route_left_penalty"][:-1], r["route_left_penalty"][1:])]].sum()), 2) == \
+        s["trip"]["routes"]["left_penalty"]["cost"]
+
+
 def test_dijkstra_and_a_star_agree(data):
     g, r, s = data
     sc = s["scale"]["distance"]

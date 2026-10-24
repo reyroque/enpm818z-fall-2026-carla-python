@@ -7,7 +7,7 @@ server, no ROS, no GPU. The `map` part also needs CARLA's Python package,
 ```bash
 python3 l7_handson.py --part map      # 0. Town01's map file: zoom, search, click
 python3 l7_handson.py --part graph    # 1. Town01's waypoint graph; click a node
-python3 l7_handson.py --part costs    # 2. the trip's route under three edge costs
+python3 l7_handson.py --part costs    # 2. every edge's three costs, and the trip's route under each
 python3 l7_handson.py --part search   # 3. Dijkstra and A*, replayed with a slider
 python3 l7_handson.py --part replan   # 4. an obstacle on the route, and the new route
 ```
@@ -69,7 +69,12 @@ Task 1 asks you to write A* on CARLA's waypoint graph yourself.
 1. **graph**: every node (waypoint) of the graph, and in amber the 36 nodes with two
    successors: where a lane enters an intersection and the AV can go two ways. Click
    a node to print its position, heading, road, lane and successors.
-2. **costs**: the same start and goal, three edge costs. Distance gives the shortest
+2. **costs**: on the left, every edge of Town01, darker where one meter takes longer (the
+   AV slows in a turn), with the 24 left-turn edges ringed. Click an edge to print its
+   three costs: its length, its travel time (length divided by speed), and its length
+   plus 30 m if it is a left turn. Where a lane splits, two edges leave the same node
+   along the same first meters; the click lists both. On the right, the same start and
+   goal searched with each cost. Distance gives the shortest
    route (260.6 m, 4 turns). Travel time, with the AV slowed in each turn, gives a
    route 6.3 m longer with 2 turns and 3.3 s faster. Distance plus a penalty for each
    left turn gives the same route as travel time.
