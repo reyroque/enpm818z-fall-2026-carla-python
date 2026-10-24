@@ -28,7 +28,7 @@ def load_graph(path=GRAPH):
 
 
 def load_results(folder=RESULTS):
-    """routes.npz (arrays) and summary.json (numbers and the toy graph's steps)."""
+    """routes.npz (arrays) and summary.json (numbers and the intersection graph's steps)."""
     folder = Path(folder)
     r = np.load(folder / "routes.npz")
     with open(folder / "summary.json") as f:

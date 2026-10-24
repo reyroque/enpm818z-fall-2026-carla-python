@@ -6,7 +6,7 @@ server, no ROS, no GPU. The `map` part also needs CARLA's Python package,
 
 ```bash
 python3 l7_handson.py --part map      # 0. Town01's map file: zoom, search, click
-python3 l7_handson.py --part graph    # 1. Town01's waypoint graph; scroll to zoom, click a node
+python3 l7_handson.py --part graph    # 1. Town01's waypoint graph; scroll to zoom, drag to pan
 python3 l7_handson.py --part costs    # 2. every edge's three costs, and the trip's route under each
 python3 l7_handson.py --part search   # 3. Dijkstra and A*, replayed with a slider
 python3 l7_handson.py --part replan   # 4. an obstacle on the route, and the new route
@@ -69,9 +69,10 @@ Task 1 asks you to write A* on CARLA's waypoint graph yourself.
 1. **graph**: the real graph, 3107 nodes and 3143 edges. Seen whole, the nodes are 2 m
    apart and too close to tell apart, so the window shows the lanes in gray and, in
    amber, the 36 nodes with two successors: where a lane enters an intersection and the
-   AV can go two ways. Scroll to zoom in at the mouse: once the view is under 120 m
-   across, every node is a dot and every edge an arrow, pointing the way the AV drives.
-   Click a node to print its position, heading, road, lane and successors.
+   AV can go two ways. Scroll to zoom in at the mouse, and drag with the left button to
+   pan: once the view is under 120 m across, every node is a dot and every edge an arrow,
+   pointing the way the AV drives. Click a node (press and release without moving) to
+   print its position, heading, road, lane and successors.
 2. **costs**: on the left, every edge of Town01, darker where one meter takes longer (the
    AV slows in a turn), with the 24 left-turn edges ringed. Click an edge to print its
    three costs: its length, its travel time (length divided by speed), and its length
@@ -114,7 +115,7 @@ next one along its lane.
 re-planned route, and the route's reference path with saved speeds (`ref_s`,
 `ref_kappa`, `ref_cap`, `ref_fwd`, `ref_v`), which the lecture's route, path and
 trajectory figure uses. `l7_results/summary.json` holds every number, the values we chose
-(`chosen`), and the toy graph the slides run by hand.
+(`chosen`), and the intersection graph the slides search by hand.
 
 **Values we chose:** a left-turn penalty of 30 m and the obstacle's position; for the
 saved speeds, lateral acceleration in a curve at most 2.0 m/s^2, acceleration

@@ -1,7 +1,7 @@
 """L7 hands-on: one Town01 trip, from the map file to a route. Five parts.
 
   python3 l7_handson.py --part map      # Town01's map file: zoom, search a road, lane, junction, segment
-  python3 l7_handson.py --part graph    # Town01's waypoint graph; scroll to zoom, click a node
+  python3 l7_handson.py --part graph    # Town01's waypoint graph; scroll to zoom, drag to pan, click a node
   python3 l7_handson.py --part costs    # every edge's three costs; the trip's route under each
   python3 l7_handson.py --part search   # Dijkstra and A*, replayed step by step (slider)
   python3 l7_handson.py --part replan   # an obstacle on the route, and the new route
@@ -62,9 +62,9 @@ def part_graph(fig, g, r, s, zoom_below_m=120.0):
     """Town01's waypoint graph, the real one: 3107 nodes, 3143 edges. Seen whole, the nodes
     are 2 m apart and too close to tell apart, so the window shows the lanes (gray) and the
     splits (amber: two edges leave the node, one for each way out of an intersection).
-    Scroll to zoom in at the mouse: below zoom_below_m across, every node is a dot and every
-    edge an arrow, pointing the way the AV drives. Click a node to print where it is and
-    where it leads."""
+    Scroll to zoom in at the mouse, and drag with the left button to pan: below zoom_below_m
+    across, every node is a dot and every edge an arrow, pointing the way the AV drives.
+    Click a node (press and release without moving) to print where it is and where it leads."""
     ax = fig.add_subplot(111)
     draw_lanes(ax, g, lw=1.4)
     xy, ef, et = g["node_xy"], g["edge_from"], g["edge_to"]
@@ -73,7 +73,7 @@ def part_graph(fig, g, r, s, zoom_below_m=120.0):
     gs = s["graph"]
     ax.set_title(f"Town01 at 2 m: {gs['nodes']} nodes, {gs['edges']} directed edges, "
                  f"{gs['total_lane_length_m'] / 1000:.1f} km of lane\n"
-                 "scroll to zoom in: dots are nodes, arrows are edges; click a node", fontsize=11)
+                 "scroll to zoom, drag to pan: dots are nodes, arrows are edges; click a node", fontsize=11)
     ax.legend(loc="upper right", fontsize=10)
     axes_map(ax)
     info = ax.text(0.01, 0.01, "click a node", transform=ax.transAxes, fontsize=10, va="bottom",
@@ -109,6 +109,35 @@ def part_graph(fig, g, r, s, zoom_below_m=120.0):
         ax.set_xlim(ev.xdata - (ev.xdata - x0) * f, ev.xdata + (x1 - ev.xdata) * f)
         fig.canvas.draw_idle()
 
+    drag = {}                                                 # the press that may start a pan
+
+    def on_press(ev):
+        if ev.inaxes is ax and ev.button == 1:
+            drag.update(x=ev.x, y=ev.y, xlim=ax.get_xlim(), ylim=ax.get_ylim(), moved=False)
+
+    def on_motion(ev):
+        """Move the view with the mouse while the left button is held (screen pixels to meters)."""
+        if not drag or ev.x is None:
+            return
+        dx, dy = ev.x - drag["x"], ev.y - drag["y"]
+        if not drag["moved"] and abs(dx) + abs(dy) < 5:     # a few pixels of jitter is still a click
+            return
+        drag["moved"] = True
+        (x0, x1), (y0, y1) = drag["xlim"], drag["ylim"]
+        mx, my = (x1 - x0) / ax.bbox.width, (y1 - y0) / ax.bbox.height   # meters per pixel
+        ax.set_ylim(y0 - dy * my, y1 - dy * my)
+        ax.set_xlim(x0 - dx * mx, x1 - dx * mx)
+        fig.canvas.draw_idle()
+
+    def on_release(ev):
+        """A release after a pan ends it; a release without moving is a click on a node."""
+        if not drag:
+            return
+        moved = drag["moved"]
+        drag.clear()
+        if not moved:
+            on_click(ev)
+
     def on_click(ev):
         if ev.inaxes is not ax or ev.xdata is None:
             return
@@ -121,7 +150,9 @@ def part_graph(fig, g, r, s, zoom_below_m=120.0):
                       + "\nsuccessors: " + ", ".join(f"node {int(a)} ({b:.2f} m)" for a, b in zip(succ, lens)))
         fig.canvas.draw_idle()
     fig.canvas.mpl_connect("scroll_event", on_scroll)
-    fig.canvas.mpl_connect("button_press_event", on_click)
+    fig.canvas.mpl_connect("button_press_event", on_press)
+    fig.canvas.mpl_connect("motion_notify_event", on_motion)
+    fig.canvas.mpl_connect("button_release_event", on_release)
     fig._l7_close_up = draw_close_up                          # lets a script draw a zoomed still
 
 
