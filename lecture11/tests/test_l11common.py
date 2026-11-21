@@ -45,14 +45,17 @@ def test_bc_recovers_the_expert_without_detector_noise(road):
 
 
 def test_the_lecture_numbers(road):
-    # The slides quote these (measured.json in the slides repo); seed 11, test laps 100 to 119.
+    # The slides quote these (measured.json in the slides repo): training seed 6, a median
+    # run of the ten (seeds 1 to 10 finish 2 to 9 laps with behavior cloning, median 5);
+    # test laps 100 to 119.
+    assert c.TRAIN_SEED == 6
     r = c.experiment(road)
     bc, last = r["rows"][0], r["rows"][-1]
-    assert bc["finished"] == 1 and last["finished"] == 19
+    assert bc["finished"] == 5 and last["finished"] == 19
     assert np.degrees(-bc["weights"][0]) == pytest.approx(0.38, abs=0.01)
-    assert np.degrees(-last["weights"][0]) == pytest.approx(1.20, abs=0.01)
-    assert bc["open_loop_deg"] == pytest.approx(0.35, abs=0.01)
-    assert last["open_loop_deg"] == pytest.approx(0.43, abs=0.01)
+    assert np.degrees(-last["weights"][0]) == pytest.approx(1.32, abs=0.01)
+    assert bc["open_loop_deg"] == pytest.approx(0.37, abs=0.01)
+    assert last["open_loop_deg"] == pytest.approx(0.47, abs=0.01)
     assert bc["open_loop_deg"] < last["open_loop_deg"]      # better open loop, worse closed loop
 
 

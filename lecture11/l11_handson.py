@@ -57,8 +57,8 @@ def part_bc(fig, road, a):
     ax1.plot(d0.e_seen, np.degrees(d0.steer_cmd), ".", ms=2, color="0.75", label="recorded: offset seen, steering")
     xs = np.linspace(-1.5, 1.5, 2)
     we, wc = c.expert_weights()[0], pol.w[0]
-    ax1.plot(xs, np.degrees(we * xs), color=EXPERT, lw=2, label=f"expert: {np.degrees(we):.2f} deg per m")
-    ax1.plot(xs, np.degrees(wc * xs), color=CLONE, lw=2, label=f"clone learned: {np.degrees(wc):.2f} deg per m")
+    ax1.plot(xs, np.degrees(we * xs), color=EXPERT, lw=2, label=f"expert: steers back {-np.degrees(we):.2f} deg per m")
+    ax1.plot(xs, np.degrees(wc * xs), color=CLONE, lw=2, label=f"clone learned: steers back {-np.degrees(wc):.2f} deg per m")
     ax1.set_xlabel("offset the detector reports (m)"); ax1.set_ylabel("steering (deg)")
     ax1.set_title("how hard to steer back, per meter of offset"); ax1.legend(fontsize=8, loc="upper right")
     held = [c.drive(road, "expert", np.random.default_rng(10_000 + a.seed))]
@@ -70,7 +70,10 @@ def part_bc(fig, road, a):
     left = test.left_lane_at_m
     ax2.set_title(f"open-loop error {c.open_loop_error_deg(pol, held):.2f} deg; "
                   + ("finished the lap" if np.isnan(left) else f"left the lane after {left:.0f} m"))
-    print("weights (offset, heading, curvature, constant):")
+    # The offset weight as the slides give it: degrees of steering back toward the center per meter of
+    # offset, positive. (Steering left is positive, so the raw weight is negative: left of center, steer right.)
+    print(f"offset weight (deg of steering back per m of offset): expert {-np.degrees(we):.2f}, clone {-np.degrees(wc):.2f}")
+    print("all four raw weights (offset, heading, curvature, constant; radians, steering left +):")
     print("  expert", np.round(c.expert_weights(), 4))
     print("  clone ", np.round(pol.w, 4))
 
@@ -114,7 +117,7 @@ def part_dagger(fig, road, a):
     hb = np.linspace(-1.6, 1.6, 33)
     for row in rows:
         print(f"iteration {row['iteration']}: {row['samples']:6d} samples, offset weight "
-              f"{np.degrees(row['weights'][0]):6.2f} deg/m, finished {row['finished']}/{row['drives']}, "
+              f"{-np.degrees(row['weights'][0]):6.2f} deg/m, finished {row['finished']}/{row['drives']}, "
               f"open-loop error {row['open_loop_deg']:.2f} deg")
     print(f"expert: finished {r['expert']['finished']}/{r['expert']['drives']}")
 
@@ -129,8 +132,8 @@ def part_dagger(fig, road, a):
         ax2.axhline(r["expert"]["finished"], color=EXPERT, ls="--", lw=1, label="expert")
         ax2.set_xlim(0.5, len(rows) + 0.5); ax2.set_ylim(-1, 21)
         ax2.set_xlabel("DAgger iteration (1 = behavior cloning)"); ax2.legend(loc="lower right")
-        ax2.set_title(f"offset weight {np.degrees(rows[i - 1]['weights'][0]):.2f} deg/m "
-                      f"(expert {np.degrees(c.expert_weights()[0]):.2f})")
+        ax2.set_title(f"offset weight {-np.degrees(rows[i - 1]['weights'][0]):.2f} deg/m "
+                      f"(expert {-np.degrees(c.expert_weights()[0]):.2f})")
         fig.canvas.draw_idle()
 
     sl.on_changed(draw)

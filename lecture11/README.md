@@ -19,7 +19,7 @@ Add `--snapshot out.png` to save a still instead of opening a window, or
 |---|---|
 | `--detector-noise M` | the noise on the offset the clone sees, in meters (default 0.35) |
 | `--gust D` | the random push on the steering that every driver gets, in degrees (default 0.4) |
-| `--seed S` | the expert's recorded lap and DAgger's laps (default 11, the one on the slides) |
+| `--seed S` | the expert's recorded lap and DAgger's laps (default 6, the run on the slides) |
 | `--iterations N` | DAgger iterations; the first is behavior cloning (default 6) |
 
 Parts `dagger` and `eval` drive 20 test laps for each policy: they take about 15 s.
@@ -30,7 +30,9 @@ Parts `dagger` and `eval` drive 20 test laps for each policy: they take about 15
    along the lap. The dashed lines at 1.0 m are where a wheel leaves the lane.
 2. **bc**: the recorded pairs (offset the detector reports, steering the expert
    gave), the expert's rule and the clone's fitted rule; then the clone driving
-   one test lap. The terminal prints the four weights next to the expert's.
+   one test lap. The terminal prints the offset weight, in degrees of steering
+   back per meter of offset, for the expert and the clone, then all four raw
+   weights.
 3. **shift**: the clone's steering error at each step against how far it really
    is from the center, and where the expert and the clone spend their time.
 4. **dagger**: the labeled data after each iteration, and how many of 20 test

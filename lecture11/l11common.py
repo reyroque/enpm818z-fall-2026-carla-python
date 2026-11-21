@@ -223,7 +223,7 @@ def dagger(road, rng, iterations=5, expert_laps=1, beta1=1.0):
 
 # ---------------------------------------------------------------- the lecture's experiment
 
-TRAIN_SEED = 11                   # the expert's recorded lap and DAgger's drives
+TRAIN_SEED = 6                    # the expert's recorded lap and DAgger's drives (a median training run: see the slides)
 EVAL_SEEDS = tuple(range(100, 120))   # 20 test drives for every policy: new gusts, new noise
 
 
